@@ -1,34 +1,29 @@
 import { browser } from 'wxt/browser';
 
-import { classifyPageUrl, type PageKind } from '../../src/page-context';
+import { runManualDomProbe } from '../../src/manual-validation/dom-probe';
+import type { ManualDomProbeResult } from '../../src/manual-validation/dom-probe-types';
+import { findPopupElements, initializePopup } from './popup-controller';
 
-const pageStatusElement = document.querySelector<HTMLElement>(
-  '[data-page-status]',
-);
-const versionElement = document.querySelector<HTMLElement>(
-  '[data-extension-version]',
-);
+const elements = findPopupElements(document);
 
-if (!pageStatusElement || !versionElement) {
-  throw new Error('Popup status elements are missing.');
+if (elements === null) {
+  throw new Error('Popup elements are missing.');
 }
 
-const pageStatusLabels: Record<PageKind, string> = {
-  boss: 'BOSS直聘页面',
-  non_boss: '非BOSS直聘页面',
-  unknown: '无法判断当前页面',
-};
-
-versionElement.textContent = browser.runtime.getManifest().version;
-
-void browser.tabs
-  .query({ active: true, currentWindow: true })
-  .then(([activeTab]) => {
-    const classification = classifyPageUrl(activeTab?.url);
-    pageStatusElement.textContent = pageStatusLabels[classification.kind];
-    pageStatusElement.dataset.kind = classification.kind;
-  })
-  .catch(() => {
-    pageStatusElement.textContent = pageStatusLabels.unknown;
-    pageStatusElement.dataset.kind = 'unknown';
-  });
+void initializePopup(elements, {
+  version: browser.runtime.getManifest().version,
+  getActiveTab: async () => {
+    const [activeTab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    return activeTab;
+  },
+  executeProbe: async (tabId): Promise<ManualDomProbeResult | undefined> => {
+    const [injectionResult] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: runManualDomProbe,
+    });
+    return injectionResult?.result;
+  },
+});

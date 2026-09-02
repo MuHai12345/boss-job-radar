@@ -10,6 +10,8 @@ const buildTargets = [
   { name: 'Chrome', directory: 'chrome-mv3' },
   { name: 'Edge', directory: 'edge-mv3' },
 ];
+const expectedPermissions = ['activeTab', 'scripting'];
+const forbiddenPermissions = ['tabs', 'storage', 'cookies'];
 
 const forbiddenManifestKeys = [
   'background',
@@ -41,10 +43,18 @@ for (const target of buildTargets) {
     `${target.name}: popup is missing`,
   );
   assert.deepEqual(
-    manifest.permissions,
-    ['activeTab'],
-    `${target.name}: only activeTab is allowed`,
+    [...manifest.permissions].sort(),
+    [...expectedPermissions].sort(),
+    `${target.name}: permissions must be exactly activeTab and scripting`,
   );
+
+  for (const permission of forbiddenPermissions) {
+    assert.equal(
+      manifest.permissions.includes(permission),
+      false,
+      `${target.name}: forbidden permission ${permission}`,
+    );
+  }
 
   for (const key of forbiddenManifestKeys) {
     assert.equal(
@@ -61,6 +71,6 @@ for (const target of buildTargets) {
   );
 
   console.log(
-    `${target.name}: PASS (MV3, popup, version ${manifest.version}, activeTab only)`,
+    `${target.name}: PASS (MV3, popup, version ${manifest.version}, activeTab + scripting only)`,
   );
 }

@@ -28,7 +28,28 @@
         </div>
       </dl>
 
-      <p class="scope-note">仅识别当前页面域名，不读取岗位内容。</p>
+      <section class="probe-action" data-manual-probe-action hidden>
+        <h2>人工 DOM 验证</h2>
+        <p class="privacy-note">
+          仅在你点击后读取当前页面的有限 DOM 结构摘要，不自动采集、不保存、不上传。
+        </p>
+        <button type="button" data-manual-probe-button disabled>
+          人工验证当前页面
+        </button>
+        <p class="probe-status" data-probe-status aria-live="polite"></p>
+      </section>
+
+      <section class="probe-result" data-probe-result hidden>
+        <h2>结构诊断结果</h2>
+        <p class="share-warning">
+          请在发送给 ChatGPT 前自行确认内容中没有不希望分享的信息。
+        </p>
+        <pre data-probe-output tabindex="0"></pre>
+      </section>
+
+      <p class="scope-note">
+        打开 popup 只识别当前页面；不会自动读取页面 DOM。
+      </p>
     </main>
 
     <script type="module" src="./main.ts"></script>

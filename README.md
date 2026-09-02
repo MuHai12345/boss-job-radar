@@ -6,11 +6,13 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 1 / Batch 3：基于 fixture 的岗位详情解析器**，状态为 `implementation_complete_awaiting_external_review`。
+当前处于 **Phase 2 / Batch 1：人工 DOM 验证 probe**，状态为 `implementation_complete_awaiting_external_review`。
 
-当前仓库具备基于人工构造、脱敏 fixture 的岗位卡片 parser、岗位详情 parser，以及从 fixture 指定 JD container 保留段落、列表项和基础换行的完整 JD 文本解析能力。这些能力尚未映射或验证真实 BOSS DOM，因此当前程序仍不能声称已经能够采集真实 BOSS 岗位。
+当前仓库在 Phase 1 的脱敏 fixture 解析能力基础上，增加了由用户主动触发、只针对当前活动 BOSS 页面的一次性有限 DOM 结构诊断工具。它只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
-popup 行为保持不变：用户点击扩展图标后，只识别激活页面是否属于 BOSS直聘并显示扩展版本与“当前尚未开始采集”，不读取页面 DOM。当前也不具备真实岗位采集、保存或分析能力。
+打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。只有在当前页面属于 BOSS直聘且用户本人点击“人工验证当前页面”后，扩展才执行一次只读 probe，并在 popup 内显示最多 20 个候选结构、每个最多 120 字符文本预览的脱敏 JSON 摘要。结果不自动保存、不自动复制、不上传，也不发起网络请求。
+
+本轮没有建立真实 BOSS selector，也没有验证任何真实岗位字段。完成代码后仍需等待外部审阅；真实 BOSS 页面访问和 DOM 验证只能由用户本人在审阅通过后执行。
 
 ## 文档入口
 
@@ -52,8 +54,9 @@ npm run verify:manifests
 - 搜索城市固定为上海，核心方向是电商运营入门岗位。
 - 追求高召回，低分或信息不完整岗位只能被降级或标记，不能被静默隐藏。
 - 只规划读取用户当前页面已经展示的 DOM，不调用 BOSS 私有 API。
+- DOM probe 只在用户点击按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 最终查看和投递决定由用户本人完成。
 
-后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Phase 2。
+后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Phase 2 / Batch 2。
