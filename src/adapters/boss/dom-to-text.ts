@@ -22,6 +22,13 @@ const blockElementNames = new Set([
   'UL',
 ]);
 
+const excludedElementNames = new Set([
+  'SCRIPT',
+  'STYLE',
+  'NOSCRIPT',
+  'TEMPLATE',
+]);
+
 function appendNodeText(node: Node, chunks: string[]): void {
   if (node.nodeType === 3) {
     chunks.push(node.textContent?.replace(/\s+/g, ' ') ?? '');
@@ -36,6 +43,9 @@ function appendNodeText(node: Node, chunks: string[]): void {
   }
 
   const element = node as Element;
+  if (excludedElementNames.has(element.tagName)) {
+    return;
+  }
   if (element.tagName === 'BR') {
     chunks.push('\n');
     return;

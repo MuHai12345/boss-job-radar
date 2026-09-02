@@ -6,9 +6,9 @@ export interface JobDetailSelectorProfile {
   experience: string;
   education: string;
   tags: string;
-  link: string;
+  link: string | null;
   recruiterActivity: string;
-  published: string;
+  published: string | null;
   fullJd: string;
 }
 
@@ -30,3 +30,23 @@ export const syntheticFixtureJobDetailSelectorProfile: JobDetailSelectorProfile 
     published: '[data-fixture-detail-published]',
     fullJd: '[data-fixture-detail-full-jd]',
   };
+
+/**
+ * Verified from user-run Targeted Probes on 2026-09-02 and compared across
+ * multiple samples by the external ChatGPT reviewer. This is not an official
+ * BOSS API contract and may drift. Unknown fields stay explicit so the parser
+ * reports missing data rather than guessing selectors or dropping the detail.
+ */
+export const verifiedBossJobDetailSelectorProfile: JobDetailSelectorProfile = {
+  title: '.info-primary .name h1',
+  company: '.job-sider .company-info',
+  salary: '.info-primary .salary',
+  location: '.info-primary .text-desc.text-city',
+  experience: '.info-primary .text-desc.text-experiece',
+  education: '.info-primary .text-desc.text-degree',
+  tags: '.job-keyword-list > li',
+  link: null,
+  recruiterActivity: '.boss-active-time',
+  published: null,
+  fullJd: '.job-sec-text',
+};

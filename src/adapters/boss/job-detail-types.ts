@@ -13,6 +13,7 @@ export type ParsedJobDetailMissingField =
 
 export type JobDetailWarningCode =
   | 'invalid_base_url'
+  | 'invalid_current_page_url'
   | 'invalid_job_url'
   | 'invalid_job_url_protocol'
   | 'invalid_job_url_host'

@@ -4,6 +4,7 @@ import {
   isSupportedHttpProtocol,
 } from '../../shared/boss-url-policy';
 import { domElementToStructuredText } from './dom-to-text';
+import { verifiedBossJobDetailSelectorProfile } from './job-detail-selector-profile';
 import type { JobDetailSelectorProfile } from './job-detail-selector-profile';
 import type {
   JobDetailWarningCode,
@@ -13,6 +14,7 @@ import type {
 
 export interface ParseJobDetailOptions {
   baseUrl?: string;
+  currentPageUrl?: string;
 }
 
 function normalizeText(value: string | null | undefined): string | null {
@@ -67,8 +69,34 @@ function normalizeJobUrl(
   return { jobUrl: parsedUrl.href, warnings: [] };
 }
 
-function readText(root: Document | Element, selector: string): string | null {
+function readText(
+  root: Document | Element,
+  selector: string | null,
+): string | null {
+  if (selector === null) {
+    return null;
+  }
   return normalizeText(root.querySelector(selector)?.textContent);
+}
+
+function normalizeCurrentPageUrl(currentPageUrl: string): string | null {
+  try {
+    const parsedUrl = new URL(currentPageUrl);
+    if (
+      !isSupportedHttpProtocol(parsedUrl.protocol) ||
+      !isBossHostname(parsedUrl.hostname) ||
+      parsedUrl.username !== '' ||
+      parsedUrl.password !== '' ||
+      !/^\/job_detail\/[^/]+\.html$/.test(parsedUrl.pathname)
+    ) {
+      return null;
+    }
+    parsedUrl.search = '';
+    parsedUrl.hash = '';
+    return parsedUrl.href;
+  } catch {
+    return null;
+  }
 }
 
 function readRootText(root: Document | Element): string {
@@ -90,15 +118,27 @@ export function parseJobDetail(
   const locationText = readText(root, profile.location);
   const experienceText = readText(root, profile.experience);
   const educationText = readText(root, profile.education);
-  const tags = Array.from(root.querySelectorAll(profile.tags))
+  const tags = Array.from(
+    profile.tags === null ? [] : root.querySelectorAll(profile.tags),
+  )
     .map((tag) => normalizeText(tag.textContent))
     .filter((tag): tag is string => tag !== null);
-  const link = root.querySelector(profile.link);
+  const link = profile.link === null ? null : root.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
-  const jobHrefRaw = normalizeText(hrefAttribute) === null ? null : hrefAttribute;
+  const normalizedCurrentPageUrl =
+    options.currentPageUrl === undefined
+      ? undefined
+      : normalizeCurrentPageUrl(options.currentPageUrl);
+  const jobHrefRaw =
+    normalizedCurrentPageUrl === undefined
+      ? normalizeText(hrefAttribute) === null
+        ? null
+        : hrefAttribute
+      : normalizedCurrentPageUrl;
   const recruiterActivityText = readText(root, profile.recruiterActivity);
   const publishedText = readText(root, profile.published);
-  const fullJdContainer = root.querySelector(profile.fullJd);
+  const fullJdContainer =
+    profile.fullJd === null ? null : root.querySelector(profile.fullJd);
   const fullJdText =
     fullJdContainer === null
       ? null
@@ -128,13 +168,22 @@ export function parseJobDetail(
     }
   }
 
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
+  const baseUrl =
+    options.currentPageUrl === undefined
+      ? normalizeBaseUrl(options.baseUrl)
+      : null;
   const warnings: JobDetailWarningCode[] =
-    options.baseUrl !== undefined && baseUrl === null
+    options.currentPageUrl !== undefined && normalizedCurrentPageUrl === null
+      ? ['invalid_current_page_url']
+      : options.currentPageUrl === undefined &&
+          options.baseUrl !== undefined &&
+          baseUrl === null
       ? ['invalid_base_url']
       : [];
   const urlResult =
-    jobHrefRaw === null
+    normalizedCurrentPageUrl !== undefined
+      ? { jobUrl: normalizedCurrentPageUrl, warnings: [] }
+      : jobHrefRaw === null
       ? { jobUrl: null, warnings: [] }
       : normalizeJobUrl(jobHrefRaw, baseUrl);
   warnings.push(...urlResult.warnings);
@@ -156,4 +205,11 @@ export function parseJobDetail(
     missingFields,
     warnings,
   };
+}
+
+export function parseVerifiedBossJobDetail(
+  root: Document | Element,
+  options: ParseJobDetailOptions = {},
+): ParsedJobDetail {
+  return parseJobDetail(root, verifiedBossJobDetailSelectorProfile, options);
 }

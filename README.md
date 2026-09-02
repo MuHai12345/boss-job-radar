@@ -6,13 +6,15 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 2 / Batch 2：targeted real DOM structure probe**，状态为 `implementation_complete_awaiting_external_review`。
+当前处于 **Phase 2 / Batch 3：verified real selector profiles and parser integration**，状态为 `implementation_complete_awaiting_external_review`。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
 打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。通用 Probe 保留“人工验证当前页面”按钮；Targeted Probe 的“深度验证岗位结构”按钮只在 `/web/geek/jobs` 或 `/job_detail/*.html` 页面显示，并且在点击当刻重新验证活动标签页。结果分别显示在 popup，不自动保存、不自动复制、不上传，也不发起网络请求。
 
-Targeted Probe 只在 `manual-validation` 中使用已人工确认的 `li.job-card-box`、`.info-primary`、`.job-tags`、`.job-box` 和 `.job-sider` 作为诊断 roots，并以固定节点、深度和文本上限输出结构摘要。它仍是人工诊断工具，不是真实岗位采集器、正式 production selector 或自动抓取系统；字段级 selector 仍待后续外部审阅与用户人工验证。
+Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 roots，并以固定节点、深度和文本上限输出结构摘要。用户已完成搜索页和多个详情页的人工 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对；仓库现包含与 synthetic profiles 分离的 verified BOSS selector profiles，以及由脱敏 real-shape fixtures 驱动的纯 parser 测试。
+
+仓库还包含纯内存、动态、证据驱动的 salary character mapping core。列表 parser 始终保留原始薪资 DOM 文本；mapping core 只处理调用方显式提供的列表原文和已验证详情薪资，不保存真人映射，不访问 DOM、storage 或网络，也不下载、解析或逆向字体。
 
 ## 文档入口
 
@@ -57,6 +59,8 @@ npm run verify:manifests
 - 通用和 Targeted DOM Probe 都只在用户点击对应按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
+- 不自动采集真实页面，不自动打开岗位详情，不自动点击“查看更多信息”。
+- 当前没有 local service、SQLite、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Phase 2 / Batch 3。
+后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入下一批。

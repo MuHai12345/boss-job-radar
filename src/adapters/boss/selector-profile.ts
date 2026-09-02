@@ -6,10 +6,10 @@ export interface JobCardSelectorProfile {
   location: string;
   experience: string;
   education: string;
-  tags: string;
+  tags: string | null;
   link: string;
-  recruiterActivity: string;
-  published: string;
+  recruiterActivity: string | null;
+  published: string | null;
 }
 
 /**
@@ -28,4 +28,24 @@ export const syntheticFixtureJobCardSelectorProfile: JobCardSelectorProfile = {
   link: '[data-fixture-job-link]',
   recruiterActivity: '[data-fixture-recruiter-activity]',
   published: '[data-fixture-published]',
+};
+
+/**
+ * Verified from user-run Targeted Probes on 2026-09-02 and compared across
+ * multiple samples by the external ChatGPT reviewer. This is not an official
+ * BOSS API contract and may drift. Unknown fields stay explicit so the parser
+ * keeps cards and reports explainable missing fields instead of guessing.
+ */
+export const verifiedBossJobCardSelectorProfile: JobCardSelectorProfile = {
+  card: 'li.job-card-box',
+  title: '.job-name',
+  company: '.boss-name',
+  salary: '.job-salary',
+  location: '.company-location',
+  experience: '.tag-list > li:nth-child(1)',
+  education: '.tag-list > li:nth-child(2)',
+  tags: null,
+  link: '.job-name',
+  recruiterActivity: null,
+  published: null,
 };

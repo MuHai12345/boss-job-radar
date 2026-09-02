@@ -9,6 +9,7 @@ import type {
   ParsedJobCard,
   ParsedJobCardMissingField,
 } from './job-card-types';
+import { verifiedBossJobCardSelectorProfile } from './selector-profile';
 import type { JobCardSelectorProfile } from './selector-profile';
 
 export interface ParseJobCardsOptions {
@@ -67,7 +68,10 @@ function normalizeJobUrl(
   return { jobUrl: parsedUrl.href, warnings: [] };
 }
 
-function readText(card: Element, selector: string): string | null {
+function readText(card: Element, selector: string | null): string | null {
+  if (selector === null) {
+    return null;
+  }
   return normalizeText(card.querySelector(selector)?.textContent);
 }
 
@@ -82,10 +86,12 @@ function parseCard(
   const locationText = readText(card, profile.location);
   const experienceText = readText(card, profile.experience);
   const educationText = readText(card, profile.education);
-  const tags = Array.from(card.querySelectorAll(profile.tags))
+  const tags = Array.from(
+    profile.tags === null ? [] : card.querySelectorAll(profile.tags),
+  )
     .map((tag) => normalizeText(tag.textContent))
     .filter((tag): tag is string => tag !== null);
-  const link = card.querySelector(profile.link);
+  const link = profile.link === null ? null : card.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
   const jobHrefRaw = normalizeText(hrefAttribute) === null ? null : hrefAttribute;
   const recruiterActivityText = readText(card, profile.recruiterActivity);
@@ -154,4 +160,11 @@ export function parseJobCards(
     ),
     warnings: [...warnings],
   };
+}
+
+export function parseVerifiedBossJobCards(
+  root: Document | Element,
+  options: ParseJobCardsOptions = {},
+): JobCardParseResult {
+  return parseJobCards(root, verifiedBossJobCardSelectorProfile, options);
 }
