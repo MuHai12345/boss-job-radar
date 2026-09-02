@@ -47,7 +47,7 @@ describe('verifiedBossJobDetailSelectorProfile', () => {
       '大专',
       ['店铺运营', '数据分析'],
       '招聘者 A 今日活跃',
-      '岗位职责：\n维护商品资料\n协助活动报名',
+      'CURRENT_JOB_JD\n维护商品资料\n协助活动报名',
     ],
     [
       'job-detail-b.html',
@@ -115,6 +115,32 @@ describe('verifiedBossJobDetailSelectorProfile', () => {
       );
     },
   );
+
+  it('scopes verified raw detail text to the current full JD container', () => {
+    const detail = parseVerifiedBossJobDetail(
+      fixtureDocument('job-detail-a.html'),
+      {
+        currentPageUrl:
+          'https://www.zhipin.com/job_detail/example-a.html?securityId=SYNTHETIC#private',
+      },
+    );
+
+    expect(detail.rawDetailText).toContain('CURRENT_JOB_JD');
+    expect(detail.fullJdText).toContain('CURRENT_JOB_JD');
+    for (const excludedText of [
+      'PRIVATE_ACCOUNT_NAV',
+      'PRIVATE_SCRIPT',
+      'PRIVATE_STYLE',
+      'PRIVATE_NOSCRIPT',
+      'PRIVATE_TEMPLATE',
+      'PRIVATE_COMPETITION',
+      'PRIVATE_SECURITY',
+      'PRIVATE_RECOMMENDATION',
+    ]) {
+      expect(detail.rawDetailText).not.toContain(excludedText);
+      expect(detail.fullJdText).not.toContain(excludedText);
+    }
+  });
 
   it.each([
     'https://evil.example/job_detail/example-a.html',

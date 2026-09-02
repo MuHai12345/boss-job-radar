@@ -117,3 +117,49 @@ verified detail profile：
 - 未自行宣布 Batch 3 `PASS`，未进入下一批。
 
 本轮实现完成，状态为 `implementation_complete_awaiting_external_review`，等待外部网页版 ChatGPT 独立审阅。
+
+## 外部审阅 privacy/scope repair
+
+外部网页版 ChatGPT 对 commit `a91d1a331ca7f267fd10757e2de37f002b50f5ec` 的初次结论为 `CHANGES_REQUIRED`：Critical 0、High 0、Medium 2、Low 0。本节只记录整改实现，不将 Batch 3 写为 `PASS`。
+
+### Medium 1：verified rawDetailText scope
+
+- 原问题：verified wrapper 沿用 generic `readRootText(document)`，可能把整个页面文本写入 `rawDetailText`。
+- 根因：generic parser 没有可选的 raw detail DOM scope，verified wrapper 也没有提供 scope。
+- 整改：`ParseJobDetailOptions` 增加显式 `rawDetailSelector`；verified wrapper 强制使用 `.job-sec-text`，调用方不能覆盖该安全 scope。
+- verified `rawDetailText` 与 `fullJdText` 均通过 `domElementToStructuredText` 从当前 `.job-sec-text` 提取，排除导航、竞争力分析、安全提示、推荐岗位以及 `SCRIPT`、`STYLE`、`NOSCRIPT`、`TEMPLATE`。
+- generic/synthetic parser 未提供 `rawDetailSelector` 时仍执行原有 root text 行为，现有兼容测试保持通过。
+
+### Medium 2：verified card canonical URL
+
+- 原问题：verified wrapper 沿用 generic raw-link contract，`jobHrefRaw` 和 `jobUrl` 可能保存 security/tracking query 与 hash。
+- 整改：只在 `parseVerifiedBossJobCards` 内部路径启用严格 URL policy；generic `parseJobCards` 保持原行为。
+- policy：只接受 HTTP/HTTPS、合法 BOSS hostname、无 URL userinfo、单层 `/job_detail/*.html` pathname；删除 query/hash。
+- 合法 verified link 的 `jobHrefRaw` 和 `jobUrl` 都返回 absolute canonical URL；非法协议、外部 hostname、userinfo 或非法 pathname 返回 `null`，不保留原始 href。
+- synthetic fixture 使用虚构 `securityId=TEST_SECRET`、tracking 和 hash 验证序列化结果不包含这些值；没有使用任何真人 URL 或参数。
+
+### Repair 测试与边界
+
+- 两个 Medium 均先增加 regression test 并观察到预期失败，再实施最小修复。
+- 新增 5 项测试；全仓最终测试数量和完整验证结果见下方 repair validation。
+- salary character mapping 未修改，原有 pure、in-memory、无 DOM/storage/network/font、冲突阻止解码和 incomplete 不输出部分工资的行为保持不变。
+- Manifest 未修改；没有新增权限、自动采集、自动页面解析、自动点击、自动滚动、自动翻页或自动“查看更多信息”。
+- Codex 未访问或操作真实 BOSS 页面。
+
+### Repair validation
+
+整改完成后执行完整验证并记录最终事实：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm install` | 成功；依赖已是最新，审计 247 packages，0 vulnerabilities；同时执行 prepare 成功 |
+| `npm run prepare` | 成功；WXT 0.21.4 types 生成完成 |
+| `npm run typecheck` | 成功；exit 0 |
+| `npm run lint` | 成功；exit 0 |
+| `npm test` | 成功；12 files、156 tests 全部通过 |
+| `npm run build` | 成功；Chrome MV3 构建完成 |
+| `npm run build:edge` | 成功；Edge MV3 构建完成 |
+| `npm run verify:manifests` | 成功；Chrome / Edge 均为 MV3、popup、version 0.1.0、仅 `activeTab` + `scripting` |
+| `git diff --check` | 成功；exit 0，仅有 Windows 工作区 LF/CRLF 转换提示 |
+
+整改状态：`repair implemented, awaiting external re-review`。项目状态仍为 `implementation_complete_awaiting_external_review`，不得进入下一批。

@@ -15,6 +15,7 @@ import type {
 export interface ParseJobDetailOptions {
   baseUrl?: string;
   currentPageUrl?: string;
+  rawDetailSelector?: string;
 }
 
 function normalizeText(value: string | null | undefined): string | null {
@@ -143,7 +144,18 @@ export function parseJobDetail(
     fullJdContainer === null
       ? null
       : domElementToStructuredText(fullJdContainer);
-  const rawDetailText = readRootText(root);
+  const rawDetailContainer =
+    options.rawDetailSelector === undefined
+      ? undefined
+      : options.rawDetailSelector === profile.fullJd
+      ? fullJdContainer
+      : root.querySelector(options.rawDetailSelector);
+  const rawDetailText =
+    rawDetailContainer === undefined
+      ? readRootText(root)
+      : rawDetailContainer === null
+      ? ''
+      : domElementToStructuredText(rawDetailContainer) ?? '';
 
   const missingFields: ParsedJobDetailMissingField[] = [];
   const observableFields: Array<
@@ -211,5 +223,8 @@ export function parseVerifiedBossJobDetail(
   root: Document | Element,
   options: ParseJobDetailOptions = {},
 ): ParsedJobDetail {
-  return parseJobDetail(root, verifiedBossJobDetailSelectorProfile, options);
+  return parseJobDetail(root, verifiedBossJobDetailSelectorProfile, {
+    ...options,
+    rawDetailSelector: verifiedBossJobDetailSelectorProfile.fullJd,
+  });
 }

@@ -68,6 +68,29 @@ function normalizeJobUrl(
   return { jobUrl: parsedUrl.href, warnings: [] };
 }
 
+function normalizeVerifiedJobUrl(
+  jobHrefRaw: string,
+  baseUrl: string | null,
+): { jobUrl: string | null; warnings: JobCardWarningCode[] } {
+  const normalized = normalizeJobUrl(jobHrefRaw, baseUrl);
+  if (normalized.jobUrl === null) {
+    return normalized;
+  }
+
+  const parsedUrl = new URL(normalized.jobUrl);
+  if (
+    parsedUrl.username !== '' ||
+    parsedUrl.password !== '' ||
+    !/^\/job_detail\/[^/]+\.html$/.test(parsedUrl.pathname)
+  ) {
+    return { jobUrl: null, warnings: ['invalid_job_url'] };
+  }
+
+  parsedUrl.search = '';
+  parsedUrl.hash = '';
+  return { jobUrl: parsedUrl.href, warnings: [] };
+}
+
 function readText(card: Element, selector: string | null): string | null {
   if (selector === null) {
     return null;
@@ -79,6 +102,7 @@ function parseCard(
   card: Element,
   profile: JobCardSelectorProfile,
   baseUrl: string | null,
+  useVerifiedJobUrlPolicy: boolean,
 ): ParsedJobCard {
   const title = readText(card, profile.title);
   const companyName = readText(card, profile.company);
@@ -93,7 +117,17 @@ function parseCard(
     .filter((tag): tag is string => tag !== null);
   const link = profile.link === null ? null : card.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
-  const jobHrefRaw = normalizeText(hrefAttribute) === null ? null : hrefAttribute;
+  const observedJobHrefRaw =
+    normalizeText(hrefAttribute) === null ? null : hrefAttribute;
+  const urlResult =
+    observedJobHrefRaw === null
+      ? { jobUrl: null, warnings: [] }
+      : useVerifiedJobUrlPolicy
+      ? normalizeVerifiedJobUrl(observedJobHrefRaw, baseUrl)
+      : normalizeJobUrl(observedJobHrefRaw, baseUrl);
+  const jobHrefRaw = useVerifiedJobUrlPolicy
+    ? urlResult.jobUrl
+    : observedJobHrefRaw;
   const recruiterActivityText = readText(card, profile.recruiterActivity);
   const publishedText = readText(card, profile.published);
   const rawCardText = normalizeText(card.textContent) ?? '';
@@ -120,11 +154,6 @@ function parseCard(
     }
   }
 
-  const urlResult =
-    jobHrefRaw === null
-      ? { jobUrl: null, warnings: [] }
-      : normalizeJobUrl(jobHrefRaw, baseUrl);
-
   return {
     title,
     companyName,
@@ -143,10 +172,11 @@ function parseCard(
   };
 }
 
-export function parseJobCards(
+function parseJobCardsWithPolicy(
   root: Document | Element,
   profile: JobCardSelectorProfile,
-  options: ParseJobCardsOptions = {},
+  options: ParseJobCardsOptions,
+  useVerifiedJobUrlPolicy: boolean,
 ): JobCardParseResult {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const warnings =
@@ -156,15 +186,28 @@ export function parseJobCards(
 
   return {
     cards: Array.from(root.querySelectorAll(profile.card)).map((card) =>
-      parseCard(card, profile, baseUrl),
+      parseCard(card, profile, baseUrl, useVerifiedJobUrlPolicy),
     ),
     warnings: [...warnings],
   };
+}
+
+export function parseJobCards(
+  root: Document | Element,
+  profile: JobCardSelectorProfile,
+  options: ParseJobCardsOptions = {},
+): JobCardParseResult {
+  return parseJobCardsWithPolicy(root, profile, options, false);
 }
 
 export function parseVerifiedBossJobCards(
   root: Document | Element,
   options: ParseJobCardsOptions = {},
 ): JobCardParseResult {
-  return parseJobCards(root, verifiedBossJobCardSelectorProfile, options);
+  return parseJobCardsWithPolicy(
+    root,
+    verifiedBossJobCardSelectorProfile,
+    options,
+    true,
+  );
 }

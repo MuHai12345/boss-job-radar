@@ -12,11 +12,15 @@ const fixtureUrl = new URL(
   import.meta.url,
 );
 
-function fixtureDocument(): Document {
+function documentFromHtml(html: string): Document {
   const window = new Window();
-  window.document.write(readFileSync(fileURLToPath(fixtureUrl), 'utf8'));
+  window.document.write(html);
   window.document.close();
   return window.document as unknown as Document;
+}
+
+function fixtureDocument(): Document {
+  return documentFromHtml(readFileSync(fileURLToPath(fixtureUrl), 'utf8'));
 }
 
 describe('verifiedBossJobCardSelectorProfile', () => {
@@ -51,7 +55,7 @@ describe('verifiedBossJobCardSelectorProfile', () => {
       experienceText: '经验不限',
       educationText: '大专',
       tags: [],
-      jobHrefRaw: '/job_detail/example-a.html',
+      jobHrefRaw: 'https://www.zhipin.com/job_detail/example-a.html',
       jobUrl: 'https://www.zhipin.com/job_detail/example-a.html',
       recruiterActivityText: null,
       publishedText: null,
@@ -70,5 +74,39 @@ describe('verifiedBossJobCardSelectorProfile', () => {
         'publishedText',
       ],
     });
+  });
+
+  it('removes query and hash from every verified card URL field', () => {
+    const result = parseVerifiedBossJobCards(fixtureDocument(), {
+      baseUrl: 'https://www.zhipin.com/web/geek/jobs?query=SYNTHETIC',
+    });
+    const serialized = JSON.stringify(result);
+
+    expect(result.cards[0]).toMatchObject({
+      jobHrefRaw: 'https://www.zhipin.com/job_detail/example-a.html',
+      jobUrl: 'https://www.zhipin.com/job_detail/example-a.html',
+    });
+    expect(serialized).not.toMatch(
+      /securityId|TEST_SECRET|ka=tracking|#private/,
+    );
+  });
+
+  it.each([
+    'https://user:password@www.zhipin.com/job_detail/example-a.html',
+    'https://evil.example/job_detail/example-a.html',
+    'javascript:alert(1)',
+  ])('rejects unsafe verified card URL without preserving its raw value: %s', (href) => {
+    const result = parseVerifiedBossJobCards(
+      documentFromHtml(`
+        <li class="job-card-box">
+          <a class="job-name" href="${href}">虚构岗位</a>
+        </li>
+      `),
+      { baseUrl: 'https://www.zhipin.com/web/geek/jobs' },
+    );
+
+    expect(result.cards[0]?.jobHrefRaw).toBeNull();
+    expect(result.cards[0]?.jobUrl).toBeNull();
+    expect(result.cards[0]?.missingFields).toContain('jobHrefRaw');
   });
 });
