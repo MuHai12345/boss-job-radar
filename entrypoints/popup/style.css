@@ -1,0 +1,85 @@
+:root {
+  color: #17201f;
+  background: #f4f7f6;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 340px;
+  margin: 0;
+  background: #f4f7f6;
+}
+
+.popup-shell {
+  border-top: 4px solid #00a89b;
+  padding: 22px 22px 18px;
+}
+
+.popup-header {
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #007f76;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.status-list {
+  margin: 0;
+  border-top: 1px solid #ccd7d4;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 13px 0;
+  border-bottom: 1px solid #dbe3e1;
+}
+
+dt,
+dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+dt {
+  color: #63716e;
+}
+
+dd {
+  color: #17201f;
+  font-weight: 600;
+}
+
+[data-page-status][data-kind="boss"] {
+  color: #007f76;
+}
+
+[data-page-status][data-kind="unknown"] {
+  color: #8a5a12;
+}
+
+.scope-note {
+  margin: 15px 0 0;
+  color: #687572;
+  font-size: 11px;
+  line-height: 1.55;
+}

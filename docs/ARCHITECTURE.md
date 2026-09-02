@@ -47,3 +47,17 @@ Chrome / Edge MV3 浏览器扩展
 ## Phase 0 状态
 
 本阶段只建立文档、目录结构、治理基线和长期仓库记忆。浏览器扩展、本地服务、SQLite、分析能力和审核界面均未开发。
+
+## Phase 1 已批准工具链
+
+外部网页版 ChatGPT 已为 Phase 1 的浏览器扩展基线批准以下工具链：
+
+- Vanilla TypeScript
+- npm
+- WXT 0.21.4
+- Vite 8.x
+- Vitest
+- ESLint 10.x
+- Chrome / Edge Manifest V3
+
+工具链批准不改变本文既有安全边界。各批次仍只能实现外部 Prompt 明确允许的范围。
