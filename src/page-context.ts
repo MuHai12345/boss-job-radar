@@ -1,3 +1,8 @@
+import {
+  isBossHostname,
+  isSupportedHttpProtocol,
+} from './shared/boss-url-policy';
+
 export type PageKind = 'boss' | 'non_boss' | 'unknown';
 
 export type PageClassificationReason =
@@ -14,8 +19,6 @@ export interface PageClassification {
   protocol?: string;
 }
 
-const SUPPORTED_PROTOCOLS = new Set(['http:', 'https:']);
-
 export function classifyPageUrl(
   input: string | null | undefined,
 ): PageClassification {
@@ -31,7 +34,7 @@ export function classifyPageUrl(
     return { kind: 'unknown', reason: 'invalid_url' };
   }
 
-  if (!SUPPORTED_PROTOCOLS.has(parsedUrl.protocol)) {
+  if (!isSupportedHttpProtocol(parsedUrl.protocol)) {
     return {
       kind: 'non_boss',
       reason: 'unsupported_protocol',
@@ -40,10 +43,7 @@ export function classifyPageUrl(
   }
 
   const hostname = parsedUrl.hostname.toLowerCase();
-  const isBossHostname =
-    hostname === 'zhipin.com' || hostname.endsWith('.zhipin.com');
-
-  return isBossHostname
+  return isBossHostname(hostname)
     ? { kind: 'boss', reason: 'zhipin_hostname', hostname }
     : { kind: 'non_boss', reason: 'different_hostname', hostname };
 }

@@ -3,15 +3,15 @@ import {
   isBossHostname,
   isSupportedHttpProtocol,
 } from '../../shared/boss-url-policy';
+import { domElementToStructuredText } from './dom-to-text';
+import type { JobDetailSelectorProfile } from './job-detail-selector-profile';
 import type {
-  JobCardParseResult,
-  JobCardWarningCode,
-  ParsedJobCard,
-  ParsedJobCardMissingField,
-} from './job-card-types';
-import type { JobCardSelectorProfile } from './selector-profile';
+  JobDetailWarningCode,
+  ParsedJobDetail,
+  ParsedJobDetailMissingField,
+} from './job-detail-types';
 
-export interface ParseJobCardsOptions {
+export interface ParseJobDetailOptions {
   baseUrl?: string;
 }
 
@@ -36,7 +36,7 @@ function normalizeBaseUrl(baseUrl: string | undefined): string | null {
 function normalizeJobUrl(
   jobHrefRaw: string,
   baseUrl: string | null,
-): { jobUrl: string | null; warnings: JobCardWarningCode[] } {
+): { jobUrl: string | null; warnings: JobDetailWarningCode[] } {
   let parsedUrl: URL;
 
   try {
@@ -67,34 +67,47 @@ function normalizeJobUrl(
   return { jobUrl: parsedUrl.href, warnings: [] };
 }
 
-function readText(card: Element, selector: string): string | null {
-  return normalizeText(card.querySelector(selector)?.textContent);
+function readText(root: Document | Element, selector: string): string | null {
+  return normalizeText(root.querySelector(selector)?.textContent);
 }
 
-function parseCard(
-  card: Element,
-  profile: JobCardSelectorProfile,
-  baseUrl: string | null,
-): ParsedJobCard {
-  const title = readText(card, profile.title);
-  const companyName = readText(card, profile.company);
-  const salaryText = readText(card, profile.salary);
-  const locationText = readText(card, profile.location);
-  const experienceText = readText(card, profile.experience);
-  const educationText = readText(card, profile.education);
-  const tags = Array.from(card.querySelectorAll(profile.tags))
+function readRootText(root: Document | Element): string {
+  const textContent =
+    root.nodeType === 9
+      ? (root as Document).documentElement?.textContent
+      : root.textContent;
+  return normalizeText(textContent) ?? '';
+}
+
+export function parseJobDetail(
+  root: Document | Element,
+  profile: JobDetailSelectorProfile,
+  options: ParseJobDetailOptions = {},
+): ParsedJobDetail {
+  const title = readText(root, profile.title);
+  const companyName = readText(root, profile.company);
+  const salaryText = readText(root, profile.salary);
+  const locationText = readText(root, profile.location);
+  const experienceText = readText(root, profile.experience);
+  const educationText = readText(root, profile.education);
+  const tags = Array.from(root.querySelectorAll(profile.tags))
     .map((tag) => normalizeText(tag.textContent))
     .filter((tag): tag is string => tag !== null);
-  const link = card.querySelector(profile.link);
+  const link = root.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
   const jobHrefRaw = normalizeText(hrefAttribute) === null ? null : hrefAttribute;
-  const recruiterActivityText = readText(card, profile.recruiterActivity);
-  const publishedText = readText(card, profile.published);
-  const rawCardText = normalizeText(card.textContent) ?? '';
+  const recruiterActivityText = readText(root, profile.recruiterActivity);
+  const publishedText = readText(root, profile.published);
+  const fullJdContainer = root.querySelector(profile.fullJd);
+  const fullJdText =
+    fullJdContainer === null
+      ? null
+      : domElementToStructuredText(fullJdContainer);
+  const rawDetailText = readRootText(root);
 
-  const missingFields: ParsedJobCardMissingField[] = [];
+  const missingFields: ParsedJobDetailMissingField[] = [];
   const observableFields: Array<
-    readonly [ParsedJobCardMissingField, string | null | string[]]
+    readonly [ParsedJobDetailMissingField, string | null | string[]]
   > = [
     ['title', title],
     ['companyName', companyName],
@@ -106,6 +119,7 @@ function parseCard(
     ['jobHrefRaw', jobHrefRaw],
     ['recruiterActivityText', recruiterActivityText],
     ['publishedText', publishedText],
+    ['fullJdText', fullJdText],
   ];
 
   for (const [field, value] of observableFields) {
@@ -114,10 +128,16 @@ function parseCard(
     }
   }
 
+  const baseUrl = normalizeBaseUrl(options.baseUrl);
+  const warnings: JobDetailWarningCode[] =
+    options.baseUrl !== undefined && baseUrl === null
+      ? ['invalid_base_url']
+      : [];
   const urlResult =
     jobHrefRaw === null
       ? { jobUrl: null, warnings: [] }
       : normalizeJobUrl(jobHrefRaw, baseUrl);
+  warnings.push(...urlResult.warnings);
 
   return {
     title,
@@ -131,27 +151,9 @@ function parseCard(
     jobUrl: urlResult.jobUrl,
     recruiterActivityText,
     publishedText,
-    rawCardText,
+    fullJdText,
+    rawDetailText,
     missingFields,
-    warnings: urlResult.warnings,
-  };
-}
-
-export function parseJobCards(
-  root: Document | Element,
-  profile: JobCardSelectorProfile,
-  options: ParseJobCardsOptions = {},
-): JobCardParseResult {
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
-  const warnings =
-    options.baseUrl !== undefined && baseUrl === null
-      ? (['invalid_base_url'] as const)
-      : [];
-
-  return {
-    cards: Array.from(root.querySelectorAll(profile.card)).map((card) =>
-      parseCard(card, profile, baseUrl),
-    ),
-    warnings: [...warnings],
+    warnings,
   };
 }
