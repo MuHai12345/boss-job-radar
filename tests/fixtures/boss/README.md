@@ -1,5 +1,7 @@
 # BOSS 脱敏 fixture 目录
 
-本目录用于未来经外部审阅批准的脱敏页面 fixture。
+本目录中的 HTML fixture 全部为人工构造、完全脱敏的单元测试数据，不是从真实 BOSS 页面复制或保存的 HTML，也不代表 BOSS 当前真实 DOM。
 
-Phase 1 / Batch 1 不加入真实 BOSS HTML，也不加入伪造 fixture 冒充解析能力。未来 fixture 必须去除账号、Cookie、Session、联系方式和其他用户隐私。
+fixture 不包含账号凭证、Cookie、Session、联系方式或其他私人数据。当前 `syntheticFixtureJobCardSelectorProfile` 只服务这些人工 fixture 的单元测试，是测试契约，不是经过验证的真实 BOSS selector profile。
+
+真实 BOSS selector 必须等到 Phase 2，由用户本人正常浏览页面时进行人工验证。fixture 测试通过不等于真实 BOSS 页面验证通过，也不表示程序已经能够采集真实岗位。

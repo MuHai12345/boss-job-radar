@@ -6,9 +6,11 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 1 / Batch 1：最小 MV3 扩展工程基线**，状态为 `implementation_complete_awaiting_external_review`。
+当前处于 **Phase 1 / Batch 2：基于 fixture 的岗位列表卡片解析器**，状态为 `implementation_complete_awaiting_external_review`。
 
-当前版本只能在用户点击扩展图标后识别激活页面是否属于 BOSS直聘，并显示扩展版本。它不读取页面 DOM，尚不具备岗位采集、解析、保存或分析能力。
+当前仓库新增了基于人工构造、脱敏 fixture 的岗位列表卡片 parser。该 parser 尚未映射和验证真实 BOSS DOM，因此当前程序仍不能声称已经能够采集真实 BOSS 岗位。
+
+上一批 popup 行为保持不变：用户点击扩展图标后，只识别激活页面是否属于 BOSS直聘并显示扩展版本，不读取页面 DOM。当前也不具备真实岗位采集、岗位详情完整 JD、保存或分析能力。
 
 ## 文档入口
 
@@ -54,4 +56,4 @@ npm run verify:manifests
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 最终查看和投递决定由用户本人完成。
 
-后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Batch 2。
+后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Batch 3 或 Phase 2。
