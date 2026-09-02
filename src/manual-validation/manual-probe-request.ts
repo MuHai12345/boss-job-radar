@@ -25,6 +25,11 @@ export type ExecuteManualProbe = (
   tabId: number,
 ) => Promise<ManualDomProbeResult | undefined>;
 
+function safePageIdentity(urlValue: string): string {
+  const url = new URL(urlValue);
+  return `${url.protocol}//${url.hostname}${url.pathname}`;
+}
+
 export async function requestManualDomProbe(
   tab: ManualProbeTab,
   executeProbe: ExecuteManualProbe,
@@ -64,7 +69,9 @@ export async function requestManualDomProbe(
     };
   }
 
-  if (new URL(tab.url as string).href !== new URL(result.pageUrl).href) {
+  if (
+    safePageIdentity(tab.url as string) !== safePageIdentity(result.pageUrl)
+  ) {
     return {
       ok: false,
       code: 'page_navigated',

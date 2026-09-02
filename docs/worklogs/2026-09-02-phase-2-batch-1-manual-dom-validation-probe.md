@@ -27,7 +27,7 @@
 
 probe 返回完全可 JSON serialize 的 plain object：
 
-- `pageUrl`：执行当刻的 `document.location.href`；
+- `pageUrl`：执行当刻页面的 protocol、hostname 和 pathname，不包含 query/hash；
 - `pageTitle`：`document.title`；
 - `timestamp`：ISO 时间字符串；
 - `candidateSummary`：页面有限结构计数与候选数组；
@@ -70,8 +70,9 @@ probe 返回完全可 JSON serialize 的 plain object：
 - popup 请求红灯：先增加请求协调器测试，因 production 模块尚不存在而按预期失败。
 - popup 控制器红灯：先以真实 `entrypoints/popup/index.html` 增加交互测试，因控制器模块尚不存在而按预期失败。
 - 点击前导航竞态红灯：先增加页面在 popup 打开后跳转到非 BOSS 时不得注入的回归测试；旧实现按预期失败，重新查询点击当刻活动 tab 后转绿。
-- 本轮新增 29 项测试；全仓最终为 7 个测试文件、85 项测试全部通过。
-- 新测试覆盖 JSON-safe、Cookie/storage 禁读、表单值禁读、preview 与候选上限、空白规范、DOM 顺序、hidden / `display:none` / `opacity:0`、隐藏 descendant 不作为候选依据、隐藏链接不进入链接摘要、普通可见候选、属性白名单、链接 query/hash 脱敏、无网络请求、不修改 DOM、空页面/body 缺失，以及 popup 非 BOSS 禁止执行、tab ID、scripting 错误、无结果、执行中导航、点击前导航和 warning 中文提示。
+- 隐私整改红灯：新增顶层页面 URL 脱敏和安全页面身份比较回归测试；旧实现因输出完整 query/hash、同 pathname 不同 query 被误判导航而按预期失败。
+- 初始实现新增 29 项测试；隐私整改再新增 2 项回归测试，全仓最终为 7 个测试文件、87 项测试全部通过。
+- 新测试覆盖 JSON-safe、顶层页面 URL query/hash 脱敏、安全页面身份比较、Cookie/storage 禁读、表单值禁读、preview 与候选上限、空白规范、DOM 顺序、hidden / `display:none` / `opacity:0`、隐藏 descendant 不作为候选依据、隐藏链接不进入链接摘要、普通可见候选、属性白名单、链接 query/hash 脱敏、无网络请求、不修改 DOM、空页面/body 缺失，以及 popup 非 BOSS 禁止执行、tab ID、scripting 错误、无结果、执行中导航、点击前导航和 warning 中文提示。
 - Phase 1 的 URL 分类、共享 BOSS URL policy、card parser 和 detail parser 回归测试继续通过。
 
 ## 完整验证
@@ -82,9 +83,9 @@ probe 返回完全可 JSON serialize 的 plain object：
 | `npm run prepare` | 成功；WXT 0.21.4 完成类型生成。 |
 | `npm run typecheck` | 成功；退出码 0。 |
 | `npm run lint` | 成功；退出码 0。 |
-| `npm test` | 成功；7 个测试文件、85 项测试全部通过。 |
-| `npm run build` | 成功；生成 Chrome MV3 产物，总计约 10.15 kB。 |
-| `npm run build:edge` | 成功；生成 Edge MV3 产物，总计约 10.15 kB。 |
+| `npm test` | 成功；7 个测试文件、87 项测试全部通过。 |
+| `npm run build` | 成功；生成 Chrome MV3 产物，总计约 10.28 kB。 |
+| `npm run build:edge` | 成功；生成 Edge MV3 产物，总计约 10.28 kB。 |
 | `npm run verify:manifests` | 成功；Chrome 与 Edge 均为 MV3、存在 popup、版本 `0.1.0`，permissions 严格为 `activeTab` + `scripting`，且不存在禁止项。 |
 | `git diff --check` | 成功；退出码 0；仅输出本机 Git 的 LF/CRLF 转换提示。 |
 
@@ -100,9 +101,10 @@ WXT/Vite 默认的 module preload 兼容 polyfill 包含通用 `fetch` 代码。
 ## 未验证与当前状态
 
 - Codex 未自动打开、登录或访问真实 BOSS 页面。
-- 未进行真实 BOSS DOM 验证。
-- 未进行真实列表或详情 selector 验证。
+- 用户已报告 BOSS 首页、搜索结果页和详情页的人工 probe 均成功；Codex 未参与真实页面操作。
+- 真实页面仅记录有限结构事实，未建立或验证生产列表/详情 selector profile，精确字段 selector 尚未完成。
 - 未进行真实岗位采集或验证真实岗位字段。
 - 未实现 JSON 导出、本地服务、SQLite、AI 或 Dashboard。
-- 当前状态为 `implementation_complete_awaiting_external_review`，只表示本轮实现等待外部网页版 ChatGPT 审阅，不表示 Codex 作出验收结论。
-- 当前阻塞：等待外部网页版 ChatGPT 审阅 probe；审阅通过后仍需用户本人进行真实人工验证。Codex 不进入 Phase 2 / Batch 2。
+- 外部审阅当前结论为 `CHANGES_REQUIRED`：代码主体审阅通过，但顶层页面 URL query/hash 的 Medium 隐私问题需要整改。
+- 隐私整改已完成实现，当前状态仍为 `implementation_complete_awaiting_external_review`，只表示整改等待外部网页版 ChatGPT 复审，不表示 Codex 作出验收结论。
+- Codex 不进入 Phase 2 / Batch 2。

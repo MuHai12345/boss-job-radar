@@ -59,8 +59,7 @@ describe('runManualDomProbe', () => {
 
     expect(() => JSON.parse(serialized)).not.toThrow();
     expect(result).toMatchObject({
-      pageUrl:
-        'https://www.zhipin.com/web/geek/job?query=secret#tracking',
+      pageUrl: 'https://www.zhipin.com/web/geek/job',
       pageTitle: '人工验证页',
       candidateSummary: {
         bodyExists: true,
@@ -75,6 +74,34 @@ describe('runManualDomProbe', () => {
       warnings: [],
     });
     expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('removes security and tracking parameters from the serialized page URL', () => {
+    const window = new Window({
+      url: 'https://www.zhipin.com/job_detail/example.html?securityId=TEST_SECRET&ka=tracking#private',
+    });
+    window.document.write('<body><main>安全摘要</main></body>');
+    window.document.close();
+    vi.stubGlobal('window', window);
+    vi.stubGlobal('document', window.document);
+    markVisible(window.document.querySelector('main'));
+
+    const result = runManualDomProbe();
+    const serialized = JSON.stringify(result);
+
+    expect(result.pageUrl).toBe(
+      'https://www.zhipin.com/job_detail/example.html',
+    );
+    expect(new URL(result.pageUrl)).toMatchObject({
+      protocol: 'https:',
+      hostname: 'www.zhipin.com',
+      pathname: '/job_detail/example.html',
+      search: '',
+      hash: '',
+    });
+    expect(serialized).not.toMatch(
+      /securityId|TEST_SECRET|ka|tracking|private/,
+    );
   });
 
   it('does not read or return cookie, localStorage, or sessionStorage', () => {

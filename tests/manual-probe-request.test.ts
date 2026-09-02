@@ -63,6 +63,23 @@ describe('requestManualDomProbe', () => {
     expect(outcome).toEqual({ ok: true, result: probeResult });
   });
 
+  it('treats query and hash changes on the same pathname as the same page', async () => {
+    const result = {
+      ...probeResult,
+      pageUrl: 'https://www.zhipin.com/job_detail/example.html',
+    };
+
+    const outcome = await requestManualDomProbe(
+      {
+        id: 7,
+        url: 'https://www.zhipin.com/job_detail/example.html?securityId=TEST_SECRET#private',
+      },
+      vi.fn().mockResolvedValue(result),
+    );
+
+    expect(outcome).toEqual({ ok: true, result });
+  });
+
   it('converts scripting failures into a user-readable state without retrying', async () => {
     const executeProbe = vi.fn().mockRejectedValue(new Error('Cannot access page'));
 
@@ -91,7 +108,10 @@ describe('requestManualDomProbe', () => {
 
   it('reports when the page navigated while the probe was executing', async () => {
     const outcome = await requestManualDomProbe(
-      { id: 7, url: probeResult.pageUrl },
+      {
+        id: 7,
+        url: 'https://www.zhipin.com/job_detail/original.html?tracking=one',
+      },
       vi.fn().mockResolvedValue({
         ...probeResult,
         pageUrl: 'https://www.zhipin.com/job_detail/changed.html',

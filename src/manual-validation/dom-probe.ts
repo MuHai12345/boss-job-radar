@@ -32,6 +32,10 @@ export function runManualDomProbe(): ManualDomProbeResult {
     return normalized === '' ? null : normalized.slice(0, attributeTextLimit);
   }
 
+  function safePageIdentity(location: Location): string {
+    return `${location.protocol}//${location.hostname}${location.pathname}`;
+  }
+
   function isElementVisible(element: Element): boolean {
     let current: Element | null = element;
     while (current !== null) {
@@ -195,7 +199,7 @@ export function runManualDomProbe(): ManualDomProbeResult {
           .length;
 
   return {
-    pageUrl: document.location.href,
+    pageUrl: safePageIdentity(document.location),
     pageTitle: document.title,
     timestamp: new Date().toISOString(),
     candidateSummary: {
