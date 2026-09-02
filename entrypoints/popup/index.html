@@ -39,12 +39,35 @@
         <p class="probe-status" data-probe-status aria-live="polite"></p>
       </section>
 
+      <section class="probe-action" data-targeted-probe-action hidden>
+        <h2>岗位区域深度诊断</h2>
+        <p class="privacy-note">
+          仅分析已人工确认的岗位相关 DOM 区域，不自动点击、不滚动、不保存、不上传。
+        </p>
+        <button type="button" data-targeted-probe-button disabled>
+          深度验证岗位结构
+        </button>
+        <p
+          class="probe-status"
+          data-targeted-probe-status
+          aria-live="polite"
+        ></p>
+      </section>
+
       <section class="probe-result" data-probe-result hidden>
         <h2>结构诊断结果</h2>
         <p class="share-warning">
           请在发送给 ChatGPT 前自行确认内容中没有不希望分享的信息。
         </p>
         <pre data-probe-output tabindex="0"></pre>
+      </section>
+
+      <section class="probe-result" data-targeted-probe-result hidden>
+        <h2>岗位区域深度诊断结果</h2>
+        <p class="share-warning">
+          请在发送给 ChatGPT 前自行确认内容中没有不希望分享的信息。
+        </p>
+        <pre data-targeted-probe-output tabindex="0"></pre>
       </section>
 
       <p class="scope-note">

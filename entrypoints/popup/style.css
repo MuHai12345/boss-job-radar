@@ -99,7 +99,8 @@ dd {
   line-height: 1.55;
 }
 
-[data-manual-probe-button] {
+[data-manual-probe-button],
+[data-targeted-probe-button] {
   width: 100%;
   border: 0;
   border-radius: 6px;
@@ -112,7 +113,8 @@ dd {
   cursor: pointer;
 }
 
-[data-manual-probe-button]:disabled {
+[data-manual-probe-button]:disabled,
+[data-targeted-probe-button]:disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -127,7 +129,8 @@ dd {
   color: #8a5a12;
 }
 
-[data-probe-output] {
+[data-probe-output],
+[data-targeted-probe-output] {
   max-height: 280px;
   margin: 0;
   overflow: auto;

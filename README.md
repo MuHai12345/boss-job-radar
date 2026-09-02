@@ -6,13 +6,13 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 2 / Batch 1：人工 DOM 验证 probe**，状态为 `implementation_complete_awaiting_external_review`。
+当前处于 **Phase 2 / Batch 2：targeted real DOM structure probe**，状态为 `implementation_complete_awaiting_external_review`。
 
-当前仓库在 Phase 1 的脱敏 fixture 解析能力基础上，增加了由用户主动触发、只针对当前活动 BOSS 页面的一次性有限 DOM 结构诊断工具。它只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
+当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
-打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。只有在当前页面属于 BOSS直聘且用户本人点击“人工验证当前页面”后，扩展才执行一次只读 probe，并在 popup 内显示最多 20 个候选结构、每个最多 120 字符文本预览的脱敏 JSON 摘要。结果不自动保存、不自动复制、不上传，也不发起网络请求。
+打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。通用 Probe 保留“人工验证当前页面”按钮；Targeted Probe 的“深度验证岗位结构”按钮只在 `/web/geek/jobs` 或 `/job_detail/*.html` 页面显示，并且在点击当刻重新验证活动标签页。结果分别显示在 popup，不自动保存、不自动复制、不上传，也不发起网络请求。
 
-本轮没有建立真实 BOSS selector，也没有验证任何真实岗位字段。用户本人已报告首页、搜索结果页和详情页的人工 probe 均成功；真实验证发现的顶层页面 URL query/hash 隐私问题已完成代码整改，当前状态仍为 `CHANGES_REQUIRED`，等待外部审阅。
+Targeted Probe 只在 `manual-validation` 中使用已人工确认的 `li.job-card-box`、`.info-primary`、`.job-tags`、`.job-box` 和 `.job-sider` 作为诊断 roots，并以固定节点、深度和文本上限输出结构摘要。它仍是人工诊断工具，不是真实岗位采集器、正式 production selector 或自动抓取系统；字段级 selector 仍待后续外部审阅与用户人工验证。
 
 ## 文档入口
 
@@ -53,10 +53,10 @@ npm run verify:manifests
 
 - 搜索城市固定为上海，核心方向是电商运营入门岗位。
 - 追求高召回，低分或信息不完整岗位只能被降级或标记，不能被静默隐藏。
-- 只规划读取用户当前页面已经展示的 DOM，不调用 BOSS 私有 API。
-- DOM probe 只在用户点击按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
+- 只读取用户当前页面已经存在且任务明确允许的 DOM，不调用 BOSS 私有 API。
+- 通用和 Targeted DOM Probe 都只在用户点击对应按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 最终查看和投递决定由用户本人完成。
 
-后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Phase 2 / Batch 2。
+后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入 Phase 2 / Batch 3。

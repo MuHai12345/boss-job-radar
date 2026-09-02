@@ -9,6 +9,7 @@ import {
   initializePopup,
 } from '../entrypoints/popup/popup-controller';
 import type { ManualDomProbeResult } from '../src/manual-validation/dom-probe-types';
+import type { TargetedDomProbeResult } from '../src/manual-validation/targeted-dom-probe-types';
 
 const popupHtml = readFileSync(
   fileURLToPath(new URL('../entrypoints/popup/index.html', import.meta.url)),
@@ -34,6 +35,21 @@ const probeResult: ManualDomProbeResult = {
   warnings: [],
 };
 
+const targetedProbeResult: TargetedDomProbeResult = {
+  pageUrl: 'https://www.zhipin.com/web/geek/jobs',
+  pageType: 'search_results',
+  timestamp: '2026-09-02T00:00:00.000Z',
+  matchedCardCount: 1,
+  targets: [
+    {
+      selectorLabel: 'li.job-card-box',
+      matchedCount: 1,
+      samples: [],
+    },
+  ],
+  warnings: [],
+};
+
 function createPopupDocument(): Document {
   const window = new Window();
   window.document.write(popupHtml);
@@ -52,21 +68,28 @@ describe('popup controller', () => {
     expect(document.body.textContent).toContain(
       '请在发送给 ChatGPT 前自行确认内容中没有不希望分享的信息。',
     );
+    expect(document.body.textContent).toContain('深度验证岗位结构');
+    expect(document.body.textContent).toContain(
+      '仅分析已人工确认的岗位相关 DOM 区域，不自动点击、不滚动、不保存、不上传。',
+    );
   });
 
   it('does not execute on popup open and hides the action on a non-BOSS page', async () => {
     const document = createPopupDocument();
     const elements = findPopupElements(document);
     const executeProbe = vi.fn();
+    const executeTargetedProbe = vi.fn();
 
     expect(elements).not.toBeNull();
     await initializePopup(elements!, {
       version: '0.1.0',
       getActiveTab: async () => ({ id: 3, url: 'https://example.com/' }),
       executeProbe,
+      executeTargetedProbe,
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
+    expect(executeTargetedProbe).not.toHaveBeenCalled();
     expect(elements?.pageStatus.textContent).toBe('非BOSS直聘页面');
     expect(elements?.action.hidden).toBe(true);
     expect(elements?.button.disabled).toBe(true);
@@ -81,6 +104,7 @@ describe('popup controller', () => {
       version: '0.1.0',
       getActiveTab: async () => ({ id: 7, url: probeResult.pageUrl }),
       executeProbe,
+      executeTargetedProbe: vi.fn(),
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
@@ -105,6 +129,7 @@ describe('popup controller', () => {
       version: '0.1.0',
       getActiveTab: async () => ({ id: 7, url: probeResult.pageUrl }),
       executeProbe,
+      executeTargetedProbe: vi.fn(),
     });
 
     elements.button.click();
@@ -132,6 +157,7 @@ describe('popup controller', () => {
       version: '0.1.0',
       getActiveTab,
       executeProbe,
+      executeTargetedProbe: vi.fn(),
     });
 
     elements.button.click();
@@ -159,6 +185,7 @@ describe('popup controller', () => {
         ...probeResult,
         warnings: [warning],
       }),
+      executeTargetedProbe: vi.fn(),
     });
 
     elements.button.click();
@@ -167,5 +194,126 @@ describe('popup controller', () => {
     );
 
     expect(elements.result.hidden).toBe(false);
+  });
+
+  it('keeps targeted probe hidden on BOSS home and does not run it on popup open', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeTargetedProbe = vi.fn();
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({ id: 7, url: 'https://www.zhipin.com/' }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe,
+    });
+
+    expect(elements.action.hidden).toBe(false);
+    expect(elements.targetedAction.hidden).toBe(true);
+    expect(elements.targetedButton.disabled).toBe(true);
+    expect(executeTargetedProbe).not.toHaveBeenCalled();
+  });
+
+  it('runs targeted probe exactly once after a user click and shows a separate result', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeProbe = vi.fn();
+    const executeTargetedProbe = vi.fn().mockResolvedValue(targetedProbeResult);
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({ id: 7, url: targetedProbeResult.pageUrl }),
+      executeProbe,
+      executeTargetedProbe,
+    });
+
+    expect(executeTargetedProbe).not.toHaveBeenCalled();
+    expect(elements.targetedAction.hidden).toBe(false);
+    expect(elements.targetedButton.disabled).toBe(false);
+
+    elements.targetedButton.click();
+    await vi.waitFor(() => expect(elements.targetedResult.hidden).toBe(false));
+
+    expect(executeTargetedProbe).toHaveBeenCalledTimes(1);
+    expect(executeProbe).not.toHaveBeenCalled();
+    expect(JSON.parse(elements.targetedOutput.textContent ?? '')).toEqual(
+      targetedProbeResult,
+    );
+    expect(elements.targetedStatus.textContent).toBe('深度结构验证完成。');
+    expect(elements.result.hidden).toBe(true);
+  });
+
+  it('rechecks targeted support at click time and never injects after navigation', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeTargetedProbe = vi.fn();
+    const getActiveTab = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 7, url: targetedProbeResult.pageUrl })
+      .mockResolvedValueOnce({ id: 7, url: 'https://www.zhipin.com/' });
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab,
+      executeProbe: vi.fn(),
+      executeTargetedProbe,
+    });
+
+    elements.targetedButton.click();
+    await vi.waitFor(() =>
+      expect(elements.targetedStatus.textContent).toContain(
+        '仅支持岗位搜索结果页或独立岗位详情页',
+      ),
+    );
+
+    expect(getActiveTab).toHaveBeenCalledTimes(2);
+    expect(executeTargetedProbe).not.toHaveBeenCalled();
+  });
+
+  it('keeps each probe button disabled while its request is in flight', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    let resolveManual!: (value: ManualDomProbeResult) => void;
+    let resolveTargeted!: (value: TargetedDomProbeResult) => void;
+    const executeProbe = vi.fn(
+      () =>
+        new Promise<ManualDomProbeResult>((resolve) => {
+          resolveManual = resolve;
+        }),
+    );
+    const executeTargetedProbe = vi.fn(
+      () =>
+        new Promise<TargetedDomProbeResult>((resolve) => {
+          resolveTargeted = resolve;
+        }),
+    );
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({ id: 7, url: targetedProbeResult.pageUrl }),
+      executeProbe,
+      executeTargetedProbe,
+    });
+
+    elements.button.click();
+    elements.targetedButton.click();
+    await vi.waitFor(() => {
+      expect(executeProbe).toHaveBeenCalledTimes(1);
+      expect(executeTargetedProbe).toHaveBeenCalledTimes(1);
+    });
+
+    expect(elements.button.disabled).toBe(true);
+    expect(elements.targetedButton.disabled).toBe(true);
+    elements.button.click();
+    elements.targetedButton.click();
+    expect(executeProbe).toHaveBeenCalledTimes(1);
+    expect(executeTargetedProbe).toHaveBeenCalledTimes(1);
+
+    resolveManual({ ...probeResult, pageUrl: targetedProbeResult.pageUrl });
+    resolveTargeted(targetedProbeResult);
+    await vi.waitFor(() => {
+      expect(elements.button.disabled).toBe(false);
+      expect(elements.targetedButton.disabled).toBe(false);
+    });
   });
 });
