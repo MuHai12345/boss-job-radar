@@ -6,7 +6,7 @@
 - 基准 commit：`bf66591c66e9854b6415ad2e9787bd5b4257450e`
 - 接手时本地 HEAD 与 `origin/master`：均与基准 commit 一致
 - 接手时工作区：存在 Phase 2 / Batch 4 未提交修改和新文件，本轮在该现场上继续完成
-- 当前状态：`implementation_complete_awaiting_external_review`
+- 当前状态：`externally_accepted_phase_2_batch_4_pass`
 
 本轮只完成用户主动触发的当前页面结构化 DOM extraction bridge、相关测试、最小 popup 文案修正和事实性文档更新。未进入 Phase 3。
 
@@ -37,14 +37,14 @@
 | `npm test` | 成功；14 files、187 tests 全部通过 |
 | `npm run build` | 成功；WXT 0.21.4 完成 Chrome MV3 production build，exit 0 |
 
-## 尚未执行与边界
+## 人工验证与边界
 
-- `REAL BOSS PAGE MANUAL VALIDATION: NOT PERFORMED`
-- 外部网页版 ChatGPT 审阅：`PENDING`
+- `REAL BOSS PAGE MANUAL VALIDATION: PERFORMED BY USER`
+- 外部网页版 ChatGPT 最终审阅：`Phase 2 / Batch 4 PASS`
 - 未请求或读取 Cookie、Session、密码、验证码或其他浏览器私密状态。
 - 未新增 network request、BOSS private API、storage、SQLite、localhost service、AI、Dashboard、salary mapping 接入、自动滚动、自动翻页、自动点击、自动打开详情、MutationObserver、自动投递或自动聊天。
 
-本工作日志只记录实现和开发验证事实，不构成 Phase 2 / Batch 4 外部验收结论。
+本工作日志记录实现、开发验证和外部网页版 ChatGPT 已作出的最终验收事实。
 
 ## Real page detail tag attribution repair
 
@@ -53,8 +53,8 @@
 - repair 仅在两条 verified detail 路径中移除固定 marker，再执行原有 whitespace normalization；清理后为空的 tag 不进入结果，并继续通过 `missingFields` 报告整体 tags 缺失。
 - verified selector、search extraction、generic/synthetic parser、URL policy 和其他字段处理均未改变。
 - 使用匿名 synthetic fixture 覆盖文本中间 marker、多个 tag、attribution-only tag、正常 tag、pure/live 输出和 reference equivalence；未写入用户真实公司、URL、JD 或招聘者信息。
-- 当前状态：`repair_implemented_awaiting_external_re-review`。
-- `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
+- 当时状态：`repair_implemented_awaiting_external_re-review`。
+- 当时：`REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
 
 ## Second real page detail tag validation and visible-text repair
 
@@ -62,12 +62,23 @@
 - 上一轮 marker-specific `replaceAll` 已被移除；当前实现不维护 `直聘`、`kanzhun`、`来自BOSS直聘` 或其他字符串 blacklist。
 - visible-text repair 在 DOM 顺序中递归保留普通 Text node 和可见 inline child，并跳过带 `hidden` 属性、computed `display: none`、`visibility: hidden`、`visibility: collapse` 的整个 element subtree，以及 `SCRIPT`、`STYLE`、`NOSCRIPT`、`TEMPLATE`。
 - pure `parseVerifiedBossJobDetail` 与 self-contained live `runVerifiedBossStructuredExtraction` 均应用相同语义；generic parser 继续保留原有 `textContent` 行为，search extraction、verified selectors 和其他 detail 字段未改变。
-- 当前状态：`visible_text_repair_implemented_awaiting_external_re-review`。
-- `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
+- 当时状态：`visible_text_repair_implemented_awaiting_external_re-review`。
+- 当时：`REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
 
 ## Detail tag hidden-node diagnostic
 
 - 重复真实页面验证显示 detail tag 会出现动态变化的隐藏干扰文本。
 - 本轮不再继续猜测或修改 parser repair。
 - 人工 Targeted Probe 已增加有限、脱敏的 detail tag diagnostic。
-- 当前等待外部审阅，并等待用户在真实 BOSS 详情页手动运行 diagnostic。
+- 当时等待外部审阅，并等待用户在真实 BOSS 详情页手动运行 diagnostic。
+
+## Phase 2 final closeout
+
+- 用户在真实 BOSS detail 页面完成最终结构化重验，外部网页版 ChatGPT 最终结论为：Phase 2 / Batch 4 `PASS`，Phase 2 `PASS`。
+- 真实验证确认动态 tag 污染来自隐藏 descendant，包括 `visibility: hidden` / zero-size 和 `display: none` 干扰文本；verified detail visible-text extraction 能正确排除这些节点，最终 tags 恢复为正常可见语义。
+- `fullJdText` / `rawDetailText` 继续严格保持 JD scope，canonical job/page URL 正常。
+- `publishedText` 因没有可靠 verified publication selector 继续保持 `null`；verified `.boss-active-time` 不存在时，`recruiterActivityText` 保持 `null`，不从其他页面状态推断。
+- search-page 真实验证此前已经通过；Phase 2 Batch 1-4 均已完成外部验收。
+- 最终验收对应实现 lineage：`4f7b9909d1d9edfb6eb910aa35c1263925191800` → `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3` → `30a794b65e2a7e347d7df1ef3d345d064a876cbc` → `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`。
+- Targeted tag diagnostic 保留，作为后续页面变化时的人工排查能力。
+- Phase 3 尚未开始；其 Batch 1 任务等待外部网页版 ChatGPT 单独给出。

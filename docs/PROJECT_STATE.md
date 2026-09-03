@@ -2,10 +2,10 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 2`
-- 当前批次：`Batch 4 - manual structured current-page extraction bridge`
-- 当前状态：`tag_diagnostic_implemented_awaiting_external_review_and_user_run`
-- 已通过的最后 commit：`bf66591c66e9854b6415ad2e9787bd5b4257450e`
+- 当前阶段：`Phase 2 - PASS`
+- 当前批次：`Phase 2 closeout`
+- 当前状态：`phase_2_pass_phase_3_not_started`
+- 已通过的最后 commit：`48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
 - Phase 1 / Batch 1：`PASS`
@@ -15,22 +15,24 @@
 - Phase 2 / Batch 1：`PASS`
 - Phase 2 / Batch 1 privacy repair：`PASS`
 - 真实 BOSS 首页 probe：用户报告成功
-- 真实 BOSS 搜索结果页：用户报告 probe 成功，已确认 `ul.rec-job-list` 列表容器和 `li.job-card-box` 岗位卡片容器
+- 真实 BOSS 搜索结果页验证：`PASS`；已确认 `ul.rec-job-list` 列表容器和 `li.job-card-box` 岗位卡片容器
 - 真实 BOSS 详情页：用户报告多个 Targeted Probe 样本成功，字段级 selector 已经外部多样本比对
 - 真实页面结构：用户已完成搜索页和多个详情页 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对
 - Phase 2 / Batch 2：`PASS`
 - Phase 2 / Batch 3：`PASS`
+- Phase 2 / Batch 4：`PASS`
+- Phase 2：`PASS`
 - verified parser：`PASS`
 - verified URL privacy repair：`PASS`
 - 真实 search selector：已形成 verified profile；业务 tags、招聘者活跃状态和发布时间保持未知
 - 真实 detail selector：已形成 verified profile；发布时间保持未知，当前岗位 URL 由调用方显式提供
 - salary PUA：已建立纯内存、动态、证据驱动的 mapping core；未硬编码真人映射，未下载、解析或逆向字体
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
-- Phase 2 / Batch 4 真实页面人工验证：重复验证显示详情 tags 会出现动态变化的隐藏干扰文本；不再继续猜测 parser 修复，已增加有限 Targeted tag diagnostic
+- Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
 - 真实页面后台自动采集：仍未开始
 - local service：未开始
-- Phase 3：不得开始
-- 当前阻塞：等待外部网页版 ChatGPT 审阅 Phase 2 / Batch 4 tag diagnostic，并由用户在真实详情页手动运行诊断
+- Phase 3：尚未开始
+- 当前阻塞：Phase 2 无阻塞；Phase 3 等待外部网页版 ChatGPT 单独给出 Batch 1 任务
 - 权限边界：Codex 无权自行宣布本批次通过或进入下一批
 - 尚未开发或验证：
   - JSON 导出
@@ -43,15 +45,15 @@
 
 这里的当前状态只表示：
 
-> 重复真实页面验证显示 detail tag 存在动态隐藏文本污染。Codex 未继续猜测 parser 修复，仅为人工 Targeted Probe 增加有限 tag diagnostic，等待外部审阅和用户在真实页面手动运行。
+> 外部网页版 ChatGPT 已基于用户最终真实页面结构化重验作出结论：Phase 2 / Batch 4 `PASS`，Phase 2 `PASS`。Phase 3 尚未开始。
 
-它不表示：
+该结论不表示：
 
-- Phase 2 / Batch 4 已验收通过；
 - verified selector 是 BOSS 官方或永久稳定的 contract；
-- 项目可以自行进入下一批。
+- Phase 3 已实现或已经开始；
+- local service、SQLite、AI 或 Dashboard 已实现。
 
-只有外部网页版 ChatGPT 审阅 GitHub 中的真实 commit 后，才能决定是否更新验收状态或进入下一阶段。
+Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
 
 ## 能力现状
 
@@ -67,4 +69,4 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
-项目没有真实页面后台自动采集、自动打开详情、JSON 导出、本地服务、数据库、AI 分析或 Dashboard。Batch 4 重复真实页面验证显示 detail tag 会出现动态隐藏文本污染；当前不再猜测 parser 修复，人工 Targeted Probe 已增加有限 tag diagnostic，等待外部审阅和用户运行诊断，Phase 3 不得开始。
+项目没有真实页面后台自动采集、自动打开详情、JSON 导出、本地服务、数据库、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 尚未开始。

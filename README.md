@@ -6,7 +6,7 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 2 / Batch 4：manual structured current-page extraction bridge**，状态为 `implementation_complete_awaiting_external_review`。
+**Phase 2 / Batch 4 已由外部网页版 ChatGPT 最终验收为 `PASS`，Phase 2 状态为 `PASS`。Phase 3 尚未开始，等待单独的 Batch 1 任务。**
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -15,6 +15,8 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 新增 **Manual Structured Current-Page Extraction**：“解析当前岗位数据”仅在 `/web/geek/jobs` 或单层 `/job_detail/*.html` 页面可用，并且必须由用户点击。它只读取当前 DOM 中已验证的岗位字段，结果暂时只显示为 popup JSON；不保存、不上传、不自动导航、不自动浏览，也不是后台采集器。
 
 Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 roots，并以固定节点、深度和文本上限输出结构摘要。用户已完成搜索页和多个详情页的人工 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对；仓库现包含与 synthetic profiles 分离的 verified BOSS selector profiles，以及由脱敏 real-shape fixtures 驱动的纯 parser 测试。
+
+最终真实页面结构化重验确认，verified detail visible-text extraction 能排除动态插入的隐藏 tag descendants，并恢复正常可见语义。有限 Targeted tag diagnostic 继续保留，供后续页面结构变化时由用户手动排查。
 
 仓库还包含纯内存、动态、证据驱动的 salary character mapping core。列表 parser 始终保留原始薪资 DOM 文本；mapping core 只处理调用方显式提供的列表原文和已验证详情薪资，不保存真人映射，不访问 DOM、storage 或网络，也不下载、解析或逆向字体。
 
@@ -65,4 +67,4 @@ npm run verify:manifests
 - 当前没有 local service、SQLite、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-后续批次和阶段均需外部网页版 ChatGPT 独立审阅并明确批准；本仓库当前不得自行进入下一批。
+Phase 3 尚未开始；其具体 Batch 1 任务需由外部网页版 ChatGPT 单独给出。本仓库不得自行开始 Phase 3。
