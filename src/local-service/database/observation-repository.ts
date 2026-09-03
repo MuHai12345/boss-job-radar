@@ -27,6 +27,7 @@ export interface JobObservationRecord extends JobObservationInput {
 
 export interface JobObservationRepository {
   append(input: JobObservationInput): { id: number };
+  appendMany(inputs: readonly JobObservationInput[]): { ids: number[] };
   getById(id: number): JobObservationRecord | null;
 }
 
@@ -158,30 +159,42 @@ export function createJobObservationRepository(
     WHERE id = ?
   `);
 
+  const appendOne = (input: JobObservationInput): number => {
+    const result = insertObservation.run(
+      input.capturedAt,
+      input.pageType,
+      input.sourcePageUrl,
+      input.jobHrefRaw,
+      input.jobUrl,
+      input.title,
+      input.companyName,
+      input.salaryText,
+      input.locationText,
+      input.experienceText,
+      input.educationText,
+      JSON.stringify(input.tags),
+      input.recruiterActivityText,
+      input.publishedText,
+      input.fullJdText,
+      input.rawText,
+      JSON.stringify(input.missingFields),
+      JSON.stringify(input.warnings),
+    );
+
+    return toObservationId(result.lastInsertRowid);
+  };
+  const appendBatch = database.transaction(
+    (inputs: readonly JobObservationInput[]): number[] =>
+      inputs.map((input) => appendOne(input)),
+  );
+
   return {
     append(input): { id: number } {
-      const result = insertObservation.run(
-        input.capturedAt,
-        input.pageType,
-        input.sourcePageUrl,
-        input.jobHrefRaw,
-        input.jobUrl,
-        input.title,
-        input.companyName,
-        input.salaryText,
-        input.locationText,
-        input.experienceText,
-        input.educationText,
-        JSON.stringify(input.tags),
-        input.recruiterActivityText,
-        input.publishedText,
-        input.fullJdText,
-        input.rawText,
-        JSON.stringify(input.missingFields),
-        JSON.stringify(input.warnings),
-      );
+      return { id: appendOne(input) };
+    },
 
-      return { id: toObservationId(result.lastInsertRowid) };
+    appendMany(inputs): { ids: number[] } {
+      return { ids: appendBatch(inputs) };
     },
 
     getById(id): JobObservationRecord | null {

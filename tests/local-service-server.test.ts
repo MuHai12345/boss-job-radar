@@ -5,7 +5,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
+  type ObservationAppender,
 } from '../src/local-service/server';
+
+const TEST_OBSERVATION_APPENDER: ObservationAppender = {
+  appendMany() {
+    return { ids: [] };
+  },
+};
 
 interface LocalResponse {
   body: string;
@@ -48,17 +55,26 @@ function sendLocalRequest(
 }
 
 describe('loopback-only local service', () => {
-  it('exposes a start API whose only option is port', () => {
+  it('exposes a start API with only the port and narrow ingestion dependency', () => {
     expectTypeOf<Parameters<typeof startLocalService>>().toEqualTypeOf<
-      [options: { readonly port: number }]
+      [
+        options: {
+          readonly observations: ObservationAppender;
+          readonly port: number;
+        },
+      ]
     >();
   });
 
   it('always binds the actual listener to IPv4 loopback and supports port 0', async () => {
     const service = await startLocalService({
       host: '0.0.0.0',
+      observations: TEST_OBSERVATION_APPENDER,
       port: 0,
-    } as unknown as { port: number });
+    } as unknown as {
+      observations: ObservationAppender;
+      port: number;
+    });
 
     try {
       expect(LOCAL_SERVICE_HOST).toBe('127.0.0.1');
@@ -74,7 +90,10 @@ describe('loopback-only local service', () => {
   });
 
   it('serves the stable health contract without reflecting local or request data', async () => {
-    const service = await startLocalService({ port: 0 });
+    const service = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
     const environmentSentinel = 'environment-secret-sentinel';
     const headerSentinel = 'request-header-secret-sentinel';
     const previousSentinel = process.env.BOSS_JOB_RADAR_TEST_SENTINEL;
@@ -109,7 +128,10 @@ describe('loopback-only local service', () => {
   });
 
   it('returns 404 for an unknown route without permissive CORS', async () => {
-    const service = await startLocalService({ port: 0 });
+    const service = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
 
     try {
       const response = await sendLocalRequest(
@@ -126,7 +148,10 @@ describe('loopback-only local service', () => {
   });
 
   it('returns 405 and Allow: GET for an unsupported health method', async () => {
-    const service = await startLocalService({ port: 0 });
+    const service = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
 
     try {
       const response = await sendLocalRequest(
@@ -144,7 +169,10 @@ describe('loopback-only local service', () => {
   });
 
   it('closes cleanly and releases its listener', async () => {
-    const service = await startLocalService({ port: 0 });
+    const service = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
 
     await service.close();
 

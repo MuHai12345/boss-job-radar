@@ -11,7 +11,14 @@ import { startLocalRuntime } from '../src/local-service/runtime';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
+  type ObservationAppender,
 } from '../src/local-service/server';
+
+const TEST_OBSERVATION_APPENDER: ObservationAppender = {
+  appendMany() {
+    return { ids: [] };
+  },
+};
 
 const temporaryDirectories: string[] = [];
 
@@ -125,7 +132,10 @@ describe('local runtime lifecycle', () => {
   });
 
   it('closes SQLite when HTTP startup fails', async () => {
-    const occupiedService = await startLocalService({ port: 0 });
+    const occupiedService = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
     const databasePath = await createTemporaryDatabasePath();
     const close = vi.spyOn(SqliteDatabase.prototype, 'close');
 
@@ -144,7 +154,10 @@ describe('local runtime lifecycle', () => {
   });
 
   it('does not leave an HTTP listener when database startup fails', async () => {
-    const releasedService = await startLocalService({ port: 0 });
+    const releasedService = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port: 0,
+    });
     const port = releasedService.address.port;
     await releasedService.close();
     const databasePath = await createTemporaryDatabasePath();
@@ -156,7 +169,10 @@ describe('local runtime lifecycle', () => {
       }),
     ).rejects.toThrow();
 
-    const replacementService = await startLocalService({ port });
+    const replacementService = await startLocalService({
+      observations: TEST_OBSERVATION_APPENDER,
+      port,
+    });
     await replacementService.close();
   });
 });

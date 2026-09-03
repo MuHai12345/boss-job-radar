@@ -6,7 +6,11 @@ import SqliteDatabase from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { openLocalDatabase } from '../src/local-service/database/database';
-import type { JobObservationInput } from '../src/local-service/database/observation-repository';
+import {
+  createJobObservationRepository,
+  type JobObservationInput,
+} from '../src/local-service/database/observation-repository';
+import { runMigrations } from '../src/local-service/database/migrations';
 
 const temporaryDirectories: string[] = [];
 
@@ -87,6 +91,73 @@ describe('job observation repository', () => {
       });
     } finally {
       database.close();
+    }
+  });
+
+  it('appends a batch in input order and returns matching ids', () => {
+    const database = openLocalDatabase({ path: ':memory:' });
+    const first = createObservation({ title: 'first synthetic title' });
+    const second = createObservation({ title: 'second synthetic title' });
+
+    try {
+      const { ids } = database.observations.appendMany([first, second]);
+
+      expect(ids).toHaveLength(2);
+      expect(ids[1]).toBeGreaterThan(ids[0]!);
+      expect(database.observations.getById(ids[0]!)).toEqual({
+        id: ids[0],
+        ...first,
+      });
+      expect(database.observations.getById(ids[1]!)).toEqual({
+        id: ids[1],
+        ...second,
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it('keeps duplicate observations as distinct rows within one batch', () => {
+    const database = openLocalDatabase({ path: ':memory:' });
+    const input = createObservation();
+
+    try {
+      const { ids } = database.observations.appendMany([input, input]);
+
+      expect(ids).toHaveLength(2);
+      expect(new Set(ids).size).toBe(2);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('rolls back every row when a batch insert fails', () => {
+    const sqlite = new SqliteDatabase(':memory:');
+    runMigrations(sqlite);
+    sqlite.exec(`
+      CREATE TRIGGER fail_synthetic_observation
+      BEFORE INSERT ON job_observations
+      WHEN NEW.title = 'force synthetic failure'
+      BEGIN
+        SELECT RAISE(ABORT, 'synthetic insert failure');
+      END;
+    `);
+    const repository = createJobObservationRepository(sqlite);
+
+    try {
+      expect(() =>
+        repository.appendMany([
+          createObservation({ title: 'would otherwise persist' }),
+          createObservation({ title: 'force synthetic failure' }),
+        ]),
+      ).toThrow('synthetic insert failure');
+      expect(
+        sqlite
+          .prepare('SELECT COUNT(*) AS count FROM job_observations')
+          .get(),
+      ).toEqual({ count: 0 });
+    } finally {
+      sqlite.close();
     }
   });
 

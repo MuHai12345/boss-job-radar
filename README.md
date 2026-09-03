@@ -6,9 +6,9 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 3 / Batch 1、Batch 2、Batch 3 及 Phase 3 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 1 为 `implementation_complete_awaiting_external_review`。**
+**Phase 3 与 Phase 4 / Batch 1 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 2 为 `implementation_complete_awaiting_external_review`。**
 
-当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery，以及 production database path 与统一 local runtime lifecycle。仍未实现 extension bridge、HTTP ingestion、dedupe、AI 和 Dashboard。
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle，以及仅限 local service 的受保护 observation ingestion HTTP protocol。仍未实现 extension → localhost bridge、host permission、extraction → observation DTO mapping、dedupe、AI 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -22,7 +22,9 @@ Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 root
 
 仓库还包含纯内存、动态、证据驱动的 salary character mapping core。列表 parser 始终保留原始薪资 DOM 文本；mapping core 只处理调用方显式提供的列表原文和已验证详情薪资，不保存真人映射，不访问 DOM、storage 或网络，也不下载、解析或逆向字体。
 
-本地存储使用 `better-sqlite3` `13.0.3`。production database 固定命名为 `boss-job-radar.sqlite3`，位于用户级 OS data directory 下的 `boss-job-radar` 子目录；production 不接受任意 database path override。底层 API 和测试仍显式传入 path。打开连接时启用 SQLite foreign keys 并自动运行显式 ordered migrations。schema version 1 只包含 append-only `job_observations` 事实快照表。有限 persistence API 只支持 `append` 和 `getById`，会在读取时把三个 JSON 字段恢复并验证为字符串数组；它不对事实字段做归一化，也不对 `job_url` 去重或建立最终 Job、SearchRun、dedupe、identity 模型。
+本地存储使用 `better-sqlite3` `13.0.3`。production database 固定命名为 `boss-job-radar.sqlite3`，位于用户级 OS data directory 下的 `boss-job-radar` 子目录；production 不接受任意 database path override。底层 API 和测试仍显式传入 path。打开连接时启用 SQLite foreign keys 并自动运行显式 ordered migrations。schema version 1 只包含 append-only `job_observations` 事实快照表。有限 persistence API 支持 `append`、transactional `appendMany` 和 `getById`，会在读取时把三个 JSON 字段恢复并验证为字符串数组；它不对事实字段做归一化，也不对 `job_url` 去重或建立最终 Job、SearchRun、dedupe、identity 模型。
+
+local service 每次启动都会在进程内生成新的高熵 bridge session token。`GET /bridge/session` 只在严格匹配当前 `127.0.0.1:<actual-port>` Host 时返回 protocol version 和当前 token，并设置 `Cache-Control: no-store`。`POST /observations` 还要求 extension-only Origin（当 Origin 存在时）、custom token header、`application/json`、identity encoding、1 MiB 实收 body 上限和严格 `JobObservationInput[]` DTO；每批最多 100 条，并通过单一 SQLite transaction 按输入顺序 append。服务不提供 permissive CORS，错误响应不回显 token、请求 payload、SQL 或数据库路径。
 
 ## 文档入口
 
@@ -53,7 +55,7 @@ npm run build:local
 npm run verify:manifests
 ```
 
-本地服务 build 后可运行 `npm run start:local`。它固定监听 `127.0.0.1:32123`，只提供 `GET /health`；可用 `BOSS_JOB_RADAR_LOCAL_PORT` 覆盖 port，但 host 不可配置。production 启动会在用户级 OS data directory 下创建 `boss-job-radar` 目录（如尚不存在），打开 `boss-job-radar.sqlite3` 并运行 schema migration；不要把该命令用于不希望触碰真实 production app-data 的 developer smoke test。
+本地服务 build 后可运行 `npm run start:local`。它固定监听 `127.0.0.1:32123`，提供稳定的 `GET /health`、`GET /bridge/session` 和受保护的 `POST /observations`；可用 `BOSS_JOB_RADAR_LOCAL_PORT` 覆盖 port，但 host 不可配置。production 启动会在用户级 OS data directory 下创建 `boss-job-radar` 目录（如尚不存在），打开 `boss-job-radar.sqlite3` 并运行 schema migration；不要把该命令用于不希望触碰真实 production app-data 的 developer smoke test。
 
 构建完成后，可在浏览器扩展管理页面开启开发者模式并选择“加载已解压的扩展”：
 
@@ -71,9 +73,9 @@ npm run verify:manifests
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
-- 当前 HTTP 服务只有 loopback-only `GET /health`，没有 CORS bridge、HTTP ingestion 或岗位导入；production local runtime 已统一管理 HTTP listener 与 SQLite 生命周期。
-- 当前 SQLite 包含 production OS data path policy、显式底层打开 API、migration runner、append-only observation schema，以及有限的 `append` / `getById` persistence API；没有 Job identity 或 dedupe。
-- 当前没有扩展到本地服务的 bridge、AI 或 Dashboard。
+- 当前 HTTP 服务固定 loopback-only，`GET /health` contract 不变，并新增受严格 Host、Origin、token、media type、body size 和 DTO validation 保护的 observation ingestion；没有 permissive CORS。
+- 当前 SQLite 包含 production OS data path policy、显式底层打开 API、migration runner、append-only observation schema，以及有限的 `append` / transactional `appendMany` / `getById` persistence API；没有 Job identity 或 dedupe。
+- 当前没有 extension → localhost bridge、host permissions、extraction → observation DTO mapping、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3 已通过外部验收；Phase 4 / Batch 1 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。
+Phase 3 与 Phase 4 / Batch 1 已通过外部验收；Phase 4 / Batch 2 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。
