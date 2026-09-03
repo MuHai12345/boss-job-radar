@@ -2,10 +2,10 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 3 - IN PROGRESS / NOT YET PASSED`
-- 当前批次：`Phase 3 / Batch 3`
-- 当前状态：`implementation_complete_awaiting_external_review`
-- 已通过的最后 commit：`b667eaa222bc065f1faff254e7a2d4c640fbf86d`
+- 当前阶段：`Phase 3 closeout`
+- 下一阶段：`Phase 4 - NOT STARTED`
+- 当前状态：`Phase 3 - PASS`
+- 已通过的最后 implementation commit：`05e5b3e6441499a213544b6b6961ecefa765afac`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
 - Phase 1 / Batch 1：`PASS`
@@ -30,33 +30,40 @@
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
 - Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
 - 真实页面后台自动采集：仍未开始
-- local service：Phase 3 / Batch 1 最小 loopback-only HTTP runtime baseline 已通过外部验收
-- SQLite storage foundation：Phase 3 / Batch 2 已通过外部验收；包含显式 path 打开、connection baseline、migration runner 和 schema version 1
-- observation persistence API：已实现有限的 append、get by id 和 file-backed close / reopen / readback recovery，等待外部审阅
-- Phase 3：`IN PROGRESS / NOT YET PASSED`
+- local service：Phase 3 / Batch 1 已通过外部验收；包含 Node local HTTP service baseline，固定绑定 IPv4 loopback `127.0.0.1`、host 不可配置、只提供 `GET /health`，没有 permissive CORS 或 HTTP ingestion
+- SQLite storage foundation：Phase 3 / Batch 2 已通过外部验收；包含 `better-sqlite3` `13.0.3`、显式 database path 打开、`foreign_keys = ON`、ordered transactional migrations、schema version 1、append-only `job_observations` schema 和 future migration fail-closed；没有 Job identity 或 dedupe
+- observation persistence API：Phase 3 / Batch 3 已通过外部验收；包含有限的 append、get by id、append-only semantics、runtime string-array JSON validation、prepared SQL parameter binding，以及 close / reopen / readback recovery
+- Phase 3：`PASS`
 - Phase 3 / Batch 1：`PASS`
 - Phase 3 / Batch 2：`PASS`
-- Phase 3 / Batch 3：`implementation_complete_awaiting_external_review`
-- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 审阅 Phase 3 / Batch 3
-- 权限边界：Codex 无权自行宣布本批次通过或进入下一批
-- 尚未开发或验证：
-  - JSON 导出
-  - HTTP ingestion 和扩展 bridge
-  - Job identity、dedupe 和最终 Job 聚合模型
+- Phase 3 / Batch 3：`PASS`
+- Phase 3 implementation lineage：`b73dc43869764f4bbd4d9de6e22d75acc0baed5f` → `b667eaa222bc065f1faff254e7a2d4c640fbf86d` → `05e5b3e6441499a213544b6b6961ecefa765afac`
+- 当前阻塞：无 Phase 3 阻塞；等待外部网页版 ChatGPT 单独批准 Phase 4 / Batch 1
+- 权限边界：Codex 无权自行宣布 Phase 4 已开始
+- 仍未实现：
   - production DB path policy
+  - HTTP ingestion
+  - extension → localhost bridge
+  - Job identity
+  - dedupe
+  - final Job aggregation
+  - SearchRun integration
   - AI
+  - deterministic job analysis
   - Dashboard
+  - auto browsing
+  - auto apply/chat
 
 ## 状态语义
 
 这里的当前状态只表示：
 
-> 外部网页版 ChatGPT 已基于用户最终真实页面结构化重验作出结论：Phase 2 / Batch 4 `PASS`，Phase 2 `PASS`。Phase 3 / Batch 1 本地服务基线与 Phase 3 / Batch 2 SQLite 存储基础均为 `PASS`；Phase 3 / Batch 3 observation persistence API 已完成实现并等待外部审阅。Phase 3 尚未通过。
+> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`。当前只进行 Phase 3 closeout；Phase 4 尚未开始。
 
 该结论不表示：
 
 - verified selector 是 BOSS 官方或永久稳定的 contract；
-- Phase 3 已通过；
+- Phase 4 已开始；
 - HTTP ingestion、扩展桥接、Job identity、dedupe、AI 或 Dashboard 已实现。
 
 Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
@@ -75,4 +82,4 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
-项目包含固定绑定 `127.0.0.1` 的最小 Node HTTP 服务，只提供 `GET /health`；host 不可配置，production port 可在严格校验后有限配置。Batch 2 新增 `better-sqlite3` `13.0.3` 本地存储基础：调用方显式提供 path，打开后启用 foreign keys 并运行 ordered transactional migrations；schema version 1 只包含 append-only `job_observations`。Batch 3 在独立 Node build boundary 内新增 storage-facing `JobObservationInput` / `JobObservationRecord` 和有限 repository，只支持 append 与按 positive safe integer id 读取；事实字符串、null、空字符串与数组顺序原样保持，三个 JSON 字段读取时必须验证为字符串数组。file-backed 测试已覆盖 close、reopen、readback recovery、迁移不重复、重复 observation 分别追加、非法 JSON fail-closed 和 SQL 参数绑定。现有 local-service 启动流程没有数据库集成，不创建 SQLite 文件；项目仍没有 HTTP ingestion、扩展 bridge、Job identity、dedupe、最终 Job 聚合、production DB path、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 当前为 `IN PROGRESS / NOT YET PASSED`。
+项目包含固定绑定 `127.0.0.1` 的最小 Node HTTP 服务，只提供 `GET /health`；host 不可配置，production port 可在严格校验后有限配置。Batch 2 新增 `better-sqlite3` `13.0.3` 本地存储基础：调用方显式提供 path，打开后启用 foreign keys 并运行 ordered transactional migrations；schema version 1 只包含 append-only `job_observations`。Batch 3 在独立 Node build boundary 内新增 storage-facing `JobObservationInput` / `JobObservationRecord` 和有限 repository，只支持 append 与按 positive safe integer id 读取；事实字符串、null、空字符串与数组顺序原样保持，三个 JSON 字段读取时必须验证为字符串数组。file-backed 测试已覆盖 close、reopen、readback recovery、迁移不重复、重复 observation 分别追加、非法 JSON fail-closed 和 SQL 参数绑定。现有 local-service 启动流程没有数据库集成，不创建 SQLite 文件；项目仍没有 HTTP ingestion、扩展 bridge、Job identity、dedupe、最终 Job 聚合、production DB path、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 已通过外部验收；Phase 4 尚未开始。

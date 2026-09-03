@@ -6,7 +6,9 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 2、Phase 3 / Batch 1 和 Phase 3 / Batch 2 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 3 / Batch 3 observation persistence API 已完成实现并等待外部审阅；Phase 3 仍为 `IN PROGRESS / NOT YET PASSED`。**
+**Phase 3 / Batch 1、Batch 2、Batch 3 及 Phase 3 均已由外部网页版 ChatGPT 验收为 `PASS`。当前处于 Phase 3 closeout；Phase 4 尚未开始。**
+
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation，以及 append-only observation persistence/recovery。仍未实现 extension bridge、HTTP ingestion、dedupe、production DB path、AI 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -74,4 +76,4 @@ npm run verify:manifests
 - 当前没有扩展到本地服务的 bridge、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3 / Batch 3 当前等待外部审阅；本仓库不得自行开始后续批次。
+Phase 3 已通过外部验收；Phase 4 仍为 `NOT STARTED`，须等待外部网页版 ChatGPT 单独批准 Phase 4 / Batch 1。

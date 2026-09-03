@@ -1,6 +1,6 @@
 # ADR-0005：本地 loopback HTTP 服务基线
 
-- 状态：Phase 3 / Batch 1 已批准，等待外部实现审阅
+- 状态：Phase 3 / Batch 1 已通过外部验收
 - 日期：2026-09-03
 
 ## 背景

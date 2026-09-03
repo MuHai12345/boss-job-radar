@@ -8,7 +8,7 @@
 - 接手时工作区：干净
 - Phase 3 / Batch 1：`PASS`
 - Phase 3 / Batch 2：`PASS`
-- 当前状态：`implementation_complete_awaiting_external_review`
+- 当前状态：`Phase 3 / Batch 3: PASS`
 
 本轮只在现有 schema version 1 上新增有限、append-only 的 `JobObservation` persistence API，以及 file-backed close / reopen / readback recovery。没有实现 HTTP ingestion、扩展 bridge、Job identity、dedupe、SearchRun、最终 Job 聚合、production DB path、AI、rules 或 dashboard。
 
@@ -55,11 +55,14 @@
 
 ## 边界与外部审阅
 
+外部网页版 ChatGPT 已完成 independent GitHub source review 和 independent storage-semantic acceptance testing，并检查：append-only、round-trip、invalid-id、corrupted-JSON、SQL-parameter-binding、closed-database 和 file-reopen 行为。该外部验收没有声称重新运行 Codex 的 npm full test suite 或 250 tests。
+
 - HTTP ingestion：`NOT IMPLEMENTED`
 - Extension bridge：`NOT IMPLEMENTED`
 - Job dedupe：`NOT IMPLEMENTED`
 - Production DB path：`NOT DECIDED`
-- Phase 3：`IN PROGRESS / NOT YET PASSED`
-- 外部审阅：`PENDING`
+- Phase 3 / Batch 3：`PASS`
+- Phase 3：`PASS`
+- 外部审阅：`PASS`
 
-本日志只记录实现与开发验证事实，不构成 Phase 3 / Batch 3 或 Phase 3 的外部验收结论。
+本日志区分 Codex developer verification 与 external acceptance；以上 `PASS` 为外部网页版 ChatGPT 的正式验收结论。
