@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",
     "eslint": "10.9.1",
     "globals": "17.12.0",
@@ -28,5 +29,8 @@
     "vite": "8.2.2",
     "vitest": "4.1.11",
     "wxt": "0.21.4"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3"
   }
 }

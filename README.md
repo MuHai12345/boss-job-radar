@@ -6,7 +6,7 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 2 已由外部网页版 ChatGPT 最终验收为 `PASS`。Phase 3 / Batch 1 本地 loopback 服务基线已完成实现并等待外部审阅；Phase 3 仍为 `IN PROGRESS / NOT YET PASSED`。**
+**Phase 2 已由外部网页版 ChatGPT 最终验收为 `PASS`，Phase 3 / Batch 1 为 `PASS`。Phase 3 / Batch 2 SQLite 存储基础已完成实现并等待外部审阅；Phase 3 仍为 `IN PROGRESS / NOT YET PASSED`。**
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -19,6 +19,8 @@ Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 root
 最终真实页面结构化重验确认，verified detail visible-text extraction 能排除动态插入的隐藏 tag descendants，并恢复正常可见语义。有限 Targeted tag diagnostic 继续保留，供后续页面结构变化时由用户手动排查。
 
 仓库还包含纯内存、动态、证据驱动的 salary character mapping core。列表 parser 始终保留原始薪资 DOM 文本；mapping core 只处理调用方显式提供的列表原文和已验证详情薪资，不保存真人映射，不访问 DOM、storage 或网络，也不下载、解析或逆向字体。
+
+本地存储基础使用 `better-sqlite3` `13.0.3`。调用方必须显式提供数据库 path；打开连接时启用 SQLite foreign keys 并自动运行显式 ordered migrations。schema version 1 只包含 append-only `job_observations` 事实快照表，不对 `job_url` 加唯一约束，也不建立最终 Job、SearchRun、dedupe 或 identity 模型。
 
 ## 文档入口
 
@@ -49,7 +51,7 @@ npm run build:local
 npm run verify:manifests
 ```
 
-本地服务 build 后可运行 `npm run start:local`。它固定监听 `127.0.0.1:32123`，只提供 `GET /health`；可用 `BOSS_JOB_RADAR_LOCAL_PORT` 覆盖 port，但 host 不可配置。
+本地服务 build 后可运行 `npm run start:local`。它固定监听 `127.0.0.1:32123`，只提供 `GET /health`；可用 `BOSS_JOB_RADAR_LOCAL_PORT` 覆盖 port，但 host 不可配置。当前启动流程不会打开数据库、创建 SQLite 文件或写入用户目录。
 
 构建完成后，可在浏览器扩展管理页面开启开发者模式并选择“加载已解压的扩展”：
 
@@ -67,8 +69,9 @@ npm run verify:manifests
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
-- 当前本地服务只有 loopback-only `GET /health`，没有 CORS bridge、岗位导入或持久化能力。
-- 当前没有 SQLite、扩展到本地服务的 bridge、AI 或 Dashboard。
+- 当前本地服务只有 loopback-only `GET /health`，没有 CORS bridge、HTTP ingestion、岗位导入或数据库集成。
+- 当前 SQLite 仅有显式打开 API、migration runner 和 append-only observation schema；没有 production path policy、persistence API、Job identity 或 dedupe。
+- 当前没有扩展到本地服务的 bridge、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3 / Batch 1 当前等待外部审阅；本仓库不得自行开始 SQLite 或后续批次。
+Phase 3 / Batch 2 当前等待外部审阅；本仓库不得自行开始后续批次。
