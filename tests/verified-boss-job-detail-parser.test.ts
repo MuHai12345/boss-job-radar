@@ -142,7 +142,7 @@ describe('verifiedBossJobDetailSelectorProfile', () => {
     }
   });
 
-  it('removes the verified BOSS attribution marker from tags before whitespace normalization', () => {
+  it('collects visible verified tag text in DOM order without string blacklists', () => {
     const detail = parseVerifiedBossJobDetail(
       fixtureDocument('job-detail-tag-attribution.html'),
       {
@@ -151,17 +151,32 @@ describe('verifiedBossJobDetailSelectorProfile', () => {
       },
     );
 
-    expect(detail.tags).toEqual(['直播电商', '电商运营', '常规标签']);
+    expect(detail.tags).toEqual([
+      '直播运营',
+      '抖音',
+      '数据',
+      '商品',
+      '店铺',
+      '电商运营',
+      '常规标签',
+      '来自BOSS直聘',
+    ]);
     expect(detail.missingFields).not.toContain('tags');
   });
 
-  it('drops verified tags that contain only the attribution marker', () => {
+  it('drops verified tags that contain only hidden or non-semantic text', () => {
     const document = fixtureDocument('job-detail-tag-attribution.html');
     const tagList = document.querySelector('.job-keyword-list');
     if (tagList === null) {
       throw new Error('Expected the synthetic tag list fixture.');
     }
-    tagList.innerHTML = '<li> 来自BOSS直聘 </li><li>来自BOSS直聘</li>';
+    tagList.innerHTML = `
+      <li><span style="display: none">污染文本</span></li>
+      <li><span hidden>污染文本</span></li>
+      <li><span style="visibility: hidden">污染文本</span></li>
+      <li><span style="visibility: collapse">污染文本</span></li>
+      <li><script>污染文本</script><style>污染文本</style></li>
+    `;
 
     const detail = parseVerifiedBossJobDetail(document, {
       currentPageUrl:

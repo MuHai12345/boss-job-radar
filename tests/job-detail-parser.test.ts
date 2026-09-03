@@ -229,6 +229,19 @@ describe('parseJobDetail', () => {
     expect(detail.fullJdText).toBe('自定义完整 JD');
   });
 
+  it('preserves generic parser textContent semantics for hidden tag descendants', () => {
+    const detail = parseJobDetail(
+      documentFromHtml(`
+        <main data-fixture-job-detail>
+          <span data-fixture-detail-tag>直<span hidden>隐藏文本</span>播</span>
+        </main>
+      `),
+      syntheticFixtureJobDetailSelectorProfile,
+    );
+
+    expect(detail.tags).toEqual(['直隐藏文本播']);
+  });
+
   it('uses null, empty tags, and controlled missing fields for an empty root', () => {
     const detail = parseJobDetail(
       documentFromHtml('<main data-fixture-job-detail></main>'),

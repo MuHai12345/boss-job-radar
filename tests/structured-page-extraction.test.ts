@@ -262,7 +262,7 @@ describe('runVerifiedBossStructuredExtraction job detail', () => {
     expect(JSON.stringify(detail)).not.toContain('recommended-a.html');
   });
 
-  it('cleans verified detail tag attribution and preserves parser equivalence', () => {
+  it('extracts visible detail tag text and preserves parser equivalence', () => {
     const pageUrl =
       'https://www.zhipin.com/job_detail/example-tag-attribution.html';
     const window = createFixtureWindow(
@@ -276,12 +276,21 @@ describe('runVerifiedBossStructuredExtraction job detail', () => {
 
     const detail = runVerifiedBossStructuredExtraction(profiles).detail;
 
-    expect(reference.tags).toEqual(['直播电商', '电商运营', '常规标签']);
+    expect(reference.tags).toEqual([
+      '直播运营',
+      '抖音',
+      '数据',
+      '商品',
+      '店铺',
+      '电商运营',
+      '常规标签',
+      '来自BOSS直聘',
+    ]);
     expect(detail?.tags).toEqual(reference.tags);
     expect(detail?.missingFields).toEqual(reference.missingFields);
   });
 
-  it('drops attribution-only live detail tags and reports the field missing', () => {
+  it('drops hidden-only live detail tags and reports the field missing', () => {
     const pageUrl =
       'https://www.zhipin.com/job_detail/example-tag-attribution.html';
     const window = createFixtureWindow(
@@ -292,7 +301,12 @@ describe('runVerifiedBossStructuredExtraction job detail', () => {
     if (tagList === null) {
       throw new Error('Expected the synthetic tag list fixture.');
     }
-    tagList.innerHTML = '<li> 来自BOSS直聘 </li>';
+    tagList.innerHTML = `
+      <li><span style="display: none">污染文本</span></li>
+      <li><span hidden>污染文本</span></li>
+      <li><span style="visibility: hidden">污染文本</span></li>
+      <li><span style="visibility: collapse">污染文本</span></li>
+    `;
     const reference = parseVerifiedBossJobDetail(
       window.document as unknown as Document,
       { currentPageUrl: pageUrl },

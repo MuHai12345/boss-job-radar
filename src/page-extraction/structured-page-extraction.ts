@@ -13,7 +13,6 @@ export function runVerifiedBossStructuredExtraction(
   profiles: VerifiedBossSelectorProfiles,
 ): StructuredPageExtractionResult {
   const cardLimit = 100;
-  const verifiedBossDetailTagAttributionMarker = '来自BOSS直聘';
   const blockElementNames = new Set([
     'ARTICLE',
     'BLOCKQUOTE',
@@ -175,6 +174,44 @@ export function runVerifiedBossStructuredExtraction(
     return normalized === '' ? null : normalized;
   }
 
+  function appendVisibleTagNodeText(node: Node, chunks: string[]): void {
+    if (node.nodeType === 3) {
+      chunks.push(node.textContent ?? '');
+      return;
+    }
+    if (node.nodeType !== 1) {
+      return;
+    }
+
+    const element = node as Element;
+    if (
+      excludedStructuredTextElementNames.has(element.tagName) ||
+      element.hasAttribute('hidden')
+    ) {
+      return;
+    }
+    const computedStyle = element.ownerDocument.defaultView?.getComputedStyle(
+      element,
+    );
+    if (
+      computedStyle?.display === 'none' ||
+      computedStyle?.visibility === 'hidden' ||
+      computedStyle?.visibility === 'collapse'
+    ) {
+      return;
+    }
+
+    for (const child of element.childNodes) {
+      appendVisibleTagNodeText(child, chunks);
+    }
+  }
+
+  function visibleTagText(tag: Element): string | null {
+    const chunks: string[] = [];
+    appendVisibleTagNodeText(tag, chunks);
+    return normalizeText(chunks.join(''));
+  }
+
   function parseCard(card: Element, pageUrl: string) {
     const profile = profiles.cardProfile;
     const title = readText(card, profile.title);
@@ -258,14 +295,7 @@ export function runVerifiedBossStructuredExtraction(
     const tags = Array.from(
       profile.tags === null ? [] : root.querySelectorAll(profile.tags),
     )
-      .map((tag) =>
-        normalizeText(
-          tag.textContent?.replaceAll(
-            verifiedBossDetailTagAttributionMarker,
-            '',
-          ),
-        ),
-      )
+      .map((tag) => visibleTagText(tag))
       .filter((tag): tag is string => tag !== null);
     const recruiterActivityText = readText(root, profile.recruiterActivity);
     const publishedText = readText(root, profile.published);

@@ -23,10 +23,49 @@ function normalizeText(value: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
-function normalizeVerifiedBossDetailTagText(
-  value: string | null | undefined,
-): string | null {
-  return normalizeText(value?.replaceAll('来自BOSS直聘', ''));
+const excludedTagTextElementNames = new Set([
+  'SCRIPT',
+  'STYLE',
+  'NOSCRIPT',
+  'TEMPLATE',
+]);
+
+function appendVisibleTagNodeText(node: Node, chunks: string[]): void {
+  if (node.nodeType === 3) {
+    chunks.push(node.textContent ?? '');
+    return;
+  }
+  if (node.nodeType !== 1) {
+    return;
+  }
+
+  const element = node as Element;
+  if (
+    excludedTagTextElementNames.has(element.tagName) ||
+    element.hasAttribute('hidden')
+  ) {
+    return;
+  }
+  const computedStyle = element.ownerDocument.defaultView?.getComputedStyle(
+    element,
+  );
+  if (
+    computedStyle?.display === 'none' ||
+    computedStyle?.visibility === 'hidden' ||
+    computedStyle?.visibility === 'collapse'
+  ) {
+    return;
+  }
+
+  for (const child of element.childNodes) {
+    appendVisibleTagNodeText(child, chunks);
+  }
+}
+
+function readVerifiedBossDetailTagText(tag: Element): string | null {
+  const chunks: string[] = [];
+  appendVisibleTagNodeText(tag, chunks);
+  return normalizeText(chunks.join(''));
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string | null {
@@ -118,7 +157,7 @@ function parseJobDetailWithTagTextNormalizer(
   root: Document | Element,
   profile: JobDetailSelectorProfile,
   options: ParseJobDetailOptions,
-  normalizeTagText: (value: string | null | undefined) => string | null,
+  readTagText: (tag: Element) => string | null,
 ): ParsedJobDetail {
   const title = readText(root, profile.title);
   const companyName = readText(root, profile.company);
@@ -129,7 +168,7 @@ function parseJobDetailWithTagTextNormalizer(
   const tags = Array.from(
     profile.tags === null ? [] : root.querySelectorAll(profile.tags),
   )
-    .map((tag) => normalizeTagText(tag.textContent))
+    .map((tag) => readTagText(tag))
     .filter((tag): tag is string => tag !== null);
   const link = profile.link === null ? null : root.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
@@ -235,7 +274,7 @@ export function parseJobDetail(
     root,
     profile,
     options,
-    normalizeText,
+    (tag) => normalizeText(tag.textContent),
   );
 }
 
@@ -250,6 +289,6 @@ export function parseVerifiedBossJobDetail(
       ...options,
       rawDetailSelector: verifiedBossJobDetailSelectorProfile.fullJd,
     },
-    normalizeVerifiedBossDetailTagText,
+    readVerifiedBossDetailTagText,
   );
 }

@@ -4,7 +4,7 @@
 
 - 当前阶段：`Phase 2`
 - 当前批次：`Batch 4 - manual structured current-page extraction bridge`
-- 当前状态：`repair_implemented_awaiting_external_re-review`
+- 当前状态：`visible_text_repair_implemented_awaiting_external_re-review`
 - 已通过的最后 commit：`bf66591c66e9854b6415ad2e9787bd5b4257450e`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
@@ -26,11 +26,11 @@
 - 真实 detail selector：已形成 verified profile；发布时间保持未知，当前岗位 URL 由调用方显式提供
 - salary PUA：已建立纯内存、动态、证据驱动的 mapping core；未硬编码真人映射，未下载、解析或逆向字体
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
-- Phase 2 / Batch 4 真实页面人工验证：首轮已进行；详情 tags 确认存在 `来自BOSS直聘` attribution 污染，修复后重验尚未进行
+- Phase 2 / Batch 4 真实页面人工验证：第二次验证已确认详情 tags 污染源于隐藏 descendant text；visible-text repair 已实现，修复后重验尚未进行
 - 真实页面后台自动采集：仍未开始
 - local service：未开始
 - Phase 3：不得开始
-- 当前阻塞：等待外部网页版 ChatGPT 复审 Phase 2 / Batch 4 tag repair，并由用户进行修复后的真实页面重验
+- 当前阻塞：等待外部网页版 ChatGPT 复审 Phase 2 / Batch 4 visible-text repair，并由用户进行修复后的真实页面重验
 - 权限边界：Codex 无权自行宣布本批次通过或进入下一批
 - 尚未开发或验证：
   - JSON 导出
@@ -43,7 +43,7 @@
 
 这里的当前状态只表示：
 
-> Codex 已根据首轮真实页面验证完成 Phase 2 / Batch 4 tag attribution repair，等待外部复审和真实页面重验。
+> Codex 已根据第二次真实页面验证完成 Phase 2 / Batch 4 visible detail tag text repair，等待外部复审和真实页面重验。
 
 它不表示：
 
@@ -67,4 +67,4 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
-项目没有真实页面后台自动采集、自动打开详情、JSON 导出、本地服务、数据库、AI 分析或 Dashboard。Batch 4 首轮真实页面人工验证已发现并触发 detail tag attribution repair；修复后重验尚未进行，Phase 3 不得开始。
+项目没有真实页面后台自动采集、自动打开详情、JSON 导出、本地服务、数据库、AI 分析或 Dashboard。Batch 4 第二次真实页面验证已确认 detail tag 污染来自隐藏 descendant text；visible-text repair 后的真实页面重验尚未进行，Phase 3 不得开始。

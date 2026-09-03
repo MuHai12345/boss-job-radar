@@ -55,3 +55,12 @@
 - 使用匿名 synthetic fixture 覆盖文本中间 marker、多个 tag、attribution-only tag、正常 tag、pure/live 输出和 reference equivalence；未写入用户真实公司、URL、JD 或招聘者信息。
 - 当前状态：`repair_implemented_awaiting_external_re-review`。
 - `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
+
+## Second real page detail tag validation and visible-text repair
+
+- 第二次真实页面验证确认：detail tag contamination 的根因是 `textContent` 读取了隐藏 descendant text，而不是 selector 错误或单一固定 marker。
+- 上一轮 marker-specific `replaceAll` 已被移除；当前实现不维护 `直聘`、`kanzhun`、`来自BOSS直聘` 或其他字符串 blacklist。
+- visible-text repair 在 DOM 顺序中递归保留普通 Text node 和可见 inline child，并跳过带 `hidden` 属性、computed `display: none`、`visibility: hidden`、`visibility: collapse` 的整个 element subtree，以及 `SCRIPT`、`STYLE`、`NOSCRIPT`、`TEMPLATE`。
+- pure `parseVerifiedBossJobDetail` 与 self-contained live `runVerifiedBossStructuredExtraction` 均应用相同语义；generic parser 继续保留原有 `textContent` 行为，search extraction、verified selectors 和其他 detail 字段未改变。
+- 当前状态：`visible_text_repair_implemented_awaiting_external_re-review`。
+- `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
