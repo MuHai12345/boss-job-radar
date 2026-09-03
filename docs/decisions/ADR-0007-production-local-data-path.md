@@ -10,7 +10,7 @@ Phase 3 已分别建立 loopback-only HTTP service、SQLite migration/storage fo
 ## 决策
 
 - production SQLite 文件固定命名为 `boss-job-radar.sqlite3`，并放在用户级 OS data directory 下的 `boss-job-radar` 子目录。
-- Windows 优先使用 `%LOCALAPPDATA%\boss-job-radar\boss-job-radar.sqlite3`；`LOCALAPPDATA` 不存在时使用 `<home>\AppData\Local\boss-job-radar\boss-job-radar.sqlite3`。`LOCALAPPDATA` 和 fallback home 都必须是包含明确 drive 或 UNC root 的 fully-qualified Windows path；rooted-without-drive、drive-relative、relative 和空路径均 fail closed。
+- Windows 优先使用 `%LOCALAPPDATA%\boss-job-radar\boss-job-radar.sqlite3`；`LOCALAPPDATA` 不存在时使用 `<home>\AppData\Local\boss-job-radar\boss-job-radar.sqlite3`。`LOCALAPPDATA` 和 fallback home 使用同一 allowlist，只接受标准 drive absolute path、包含 server/share 的完整 UNC path、完整 extended drive path 或完整 extended UNC path；rooted-without-drive、drive-relative、relative、空路径、device namespace、未批准或不完整的 extended namespace 均 fail closed。
 - macOS 使用 `<home>/Library/Application Support/boss-job-radar/boss-job-radar.sqlite3`。
 - Linux 在 `XDG_DATA_HOME` 存在且为 absolute path 时使用 `$XDG_DATA_HOME/boss-job-radar/boss-job-radar.sqlite3`，否则使用 `<home>/.local/share/boss-job-radar/boss-job-radar.sqlite3`。显式提供 relative `XDG_DATA_HOME` 时 fail closed。
 - production 不提供任意数据库路径 override，不增加 `BOSS_JOB_RADAR_DB_PATH`、`--db`、`--database` 或 `--data-dir`。底层 `openLocalDatabase({ path })` 和内部 runtime 的显式 `databasePath` 保留用于组合和测试。

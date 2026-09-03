@@ -30,10 +30,10 @@
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
 - Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
 - 真实页面后台自动采集：仍未开始
-- local service：Phase 3 / Batch 1 已通过外部验收；包含 Node local HTTP service baseline，固定绑定 IPv4 loopback `127.0.0.1`、host 不可配置、只提供 `GET /health`，没有 permissive CORS 或 HTTP ingestion；Phase 4 / Batch 1 已实现与 SQLite 的统一 production runtime lifecycle，并完成 production data path 边界 repair，等待外部复审
+- local service：Phase 3 / Batch 1 已通过外部验收；包含 Node local HTTP service baseline，固定绑定 IPv4 loopback `127.0.0.1`、host 不可配置、只提供 `GET /health`，没有 permissive CORS 或 HTTP ingestion；Phase 4 / Batch 1 已实现与 SQLite 的统一 production runtime lifecycle，POSIX permission repair 已通过外部独立验收，最终 Windows path hardening repair 等待外部复审
 - SQLite storage foundation：Phase 3 / Batch 2 已通过外部验收；包含 `better-sqlite3` `13.0.3`、显式 database path 打开、`foreign_keys = ON`、ordered transactional migrations、schema version 1、append-only `job_observations` schema 和 future migration fail-closed；没有 Job identity 或 dedupe
 - observation persistence API：Phase 3 / Batch 3 已通过外部验收；包含有限的 append、get by id、append-only semantics、runtime string-array JSON validation、prepared SQL parameter binding，以及 close / reopen / readback recovery
-- production DB path：Phase 4 / Batch 1 已实现用户级 OS data directory policy，database filename 固定为 `boss-job-radar.sqlite3`，不接受 arbitrary production path override；Windows 要求 fully-qualified path，POSIX 最终 app directory 收紧为 `0700`，等待外部复审
+- production DB path：Phase 4 / Batch 1 已实现用户级 OS data directory policy，database filename 固定为 `boss-job-radar.sqlite3`，不接受 arbitrary production path override；Windows 仅接受明确 allowlist 中的 filesystem absolute roots，POSIX 最终 app directory 收紧为 `0700`，等待外部复审
 - Phase 3：`PASS`
 - Phase 3 / Batch 1：`PASS`
 - Phase 3 / Batch 2：`PASS`
@@ -60,7 +60,7 @@
 
 这里的当前状态只表示：
 
-> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`。Phase 4 / Batch 1 首轮外部结论为 `CHANGES_REQUIRED`；两个 production data path 边界 repair 已完成并等待外部复审。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
+> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`。Phase 4 / Batch 1 第二轮外部结论为 `CHANGES_REQUIRED`；POSIX permission repair 已通过外部独立验收，最终 Windows path hardening repair 已完成并等待外部复审。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
 
 该结论不表示：
 

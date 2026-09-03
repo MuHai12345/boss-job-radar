@@ -11,6 +11,30 @@ import {
 
 const temporaryDirectories: string[] = [];
 
+const invalidWindowsDataRoots = [
+  ['rooted backslash path', '\\foo'],
+  ['rooted forward-slash path', '/foo'],
+  ['drive-relative path', 'C:relative'],
+  ['relative path', 'relative\\data'],
+  ['empty path', ''],
+  ['incomplete UNC server', '\\\\server'],
+  ['incomplete UNC server with trailing separator', '\\\\server\\'],
+  ['named-pipe device namespace', '\\\\.\\pipe\\foo'],
+  ['drive device namespace', '\\\\.\\C:\\foo'],
+  [
+    'GLOBALROOT extended namespace',
+    '\\\\?\\GLOBALROOT\\Device\\HarddiskVolume1\\foo',
+  ],
+  ['incomplete extended UNC namespace', '\\\\?\\UNC'],
+  ['empty extended UNC root', '\\\\?\\UNC\\'],
+  ['extended UNC server without share', '\\\\?\\UNC\\server'],
+  [
+    'extended UNC server with trailing separator but no share',
+    '\\\\?\\UNC\\server\\',
+  ],
+  ['incomplete extended drive root', '\\\\?\\C:'],
+] as const;
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>
@@ -69,21 +93,48 @@ describe('production data path policy', () => {
     });
   });
 
-  it.each([
-    ['rooted backslash path', '\\foo'],
-    ['rooted forward-slash path', '/foo'],
-    ['drive-relative path', 'C:relative'],
-    ['relative path', 'relative\\data'],
-    ['empty path', ''],
-  ])('rejects a %s in LOCALAPPDATA', (_description, localAppData) => {
-    expect(() =>
+  it('uses an extended UNC LOCALAPPDATA path with server and share', () => {
+    expect(
       resolveProductionDataPaths({
-        environment: { LOCALAPPDATA: localAppData },
+        environment: {
+          LOCALAPPDATA: '\\\\?\\UNC\\server\\share\\data',
+        },
         homeDirectory: 'C:\\Users\\Example',
         platform: 'win32',
       }),
-    ).toThrow('LOCALAPPDATA must be a fully-qualified Windows path');
+    ).toEqual({
+      dataDirectory:
+        '\\\\?\\UNC\\server\\share\\data\\boss-job-radar',
+      databasePath:
+        '\\\\?\\UNC\\server\\share\\data\\boss-job-radar\\boss-job-radar.sqlite3',
+    });
   });
+
+  it('uses a drive other than C for LOCALAPPDATA', () => {
+    expect(
+      resolveProductionDataPaths({
+        environment: { LOCALAPPDATA: 'D:\\Data' },
+        homeDirectory: 'C:\\Users\\Example',
+        platform: 'win32',
+      }),
+    ).toEqual({
+      dataDirectory: 'D:\\Data\\boss-job-radar',
+      databasePath: 'D:\\Data\\boss-job-radar\\boss-job-radar.sqlite3',
+    });
+  });
+
+  it.each(invalidWindowsDataRoots)(
+    'rejects a %s in LOCALAPPDATA',
+    (_description, localAppData) => {
+      expect(() =>
+        resolveProductionDataPaths({
+          environment: { LOCALAPPDATA: localAppData },
+          homeDirectory: 'C:\\Users\\Example',
+          platform: 'win32',
+        }),
+      ).toThrow('LOCALAPPDATA must be a fully-qualified Windows path');
+    },
+  );
 
   it('falls back to home AppData Local on Windows', () => {
     expect(
@@ -101,17 +152,39 @@ describe('production data path policy', () => {
   });
 
   it.each([
-    ['rooted path without a drive', '\\Users\\Example'],
-    ['relative path', 'relative'],
-  ])('rejects a %s as the Windows fallback home', (_description, homeDirectory) => {
-    expect(() =>
+    ['D:\\Users\\Example', 'D:\\Users\\Example'],
+    ['\\\\server\\share\\users\\example', '\\\\server\\share\\users\\example'],
+    ['\\\\?\\C:\\Users\\Example', '\\\\?\\C:\\Users\\Example'],
+    [
+      '\\\\?\\UNC\\server\\share\\users\\example',
+      '\\\\?\\UNC\\server\\share\\users\\example',
+    ],
+  ])('accepts %s as the Windows fallback home', (homeDirectory, expectedRoot) => {
+    expect(
       resolveProductionDataPaths({
         environment: {},
         homeDirectory,
         platform: 'win32',
       }),
-    ).toThrow('Home directory must be a fully-qualified Windows path');
+    ).toEqual({
+      dataDirectory: `${expectedRoot}\\AppData\\Local\\boss-job-radar`,
+      databasePath:
+        `${expectedRoot}\\AppData\\Local\\boss-job-radar\\boss-job-radar.sqlite3`,
+    });
   });
+
+  it.each(invalidWindowsDataRoots)(
+    'rejects a %s as the Windows fallback home',
+    (_description, homeDirectory) => {
+      expect(() =>
+        resolveProductionDataPaths({
+          environment: {},
+          homeDirectory,
+          platform: 'win32',
+        }),
+      ).toThrow('Home directory must be a fully-qualified Windows path');
+    },
+  );
 
   it('uses Library Application Support on macOS', () => {
     expect(

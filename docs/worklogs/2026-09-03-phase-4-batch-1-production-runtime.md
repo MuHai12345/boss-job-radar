@@ -20,6 +20,14 @@
 - macOS / Linux 创建最终 app data directory 时请求 `0700`，并在目录已存在时对最终 `boss-job-radar` directory 执行 `chmod(0700)`；chmod 失败直接向上抛出。Windows 不调用 chmod。
 - 不删除或清空目录，不修改数据库内容，不 chmod 父级用户目录。
 
+### Final Windows path hardening repair
+
+- 第二轮外部结论：`CHANGES_REQUIRED`
+- repair 基准 commit：`8d5369f69d3f358eea487cd82765232d8b8b5d37`
+- POSIX app-directory permission repair 已通过外部独立验收，本轮没有修改 POSIX permission implementation。
+- Windows data root 改为显式 allowlist：标准 drive absolute、完整 UNC、完整 extended drive 和完整 extended UNC filesystem paths。
+- `\\.\` device namespace、`\\?\GLOBALROOT`、其他未批准的 namespace，以及缺少 drive separator 或 UNC server/share 的不完整 roots 均 fail closed；相同 contract 同时用于 `LOCALAPPDATA` 和 fallback home。
+
 ## 完成内容
 
 - 新增可测试的 production data path resolver，由调用方显式传入 platform、environment 和 home directory，不依赖测试机真实用户目录。
@@ -49,6 +57,16 @@ Repair targeted developer verification：
 | 命令 | 结果 |
 | --- | --- |
 | `npm test -- tests/production-data-path.test.ts` | RED：旧实现按预期出现 8 个失败；GREEN：16 passed，当前 Windows developer host 上 2 个 POSIX-only mode tests skipped |
+| `npm run typecheck` | 成功；exit 0 |
+| `npm run lint` | 成功；exit 0 |
+| `npm run build:local` | 成功；exit 0 |
+| `git diff --check` | 成功；exit 0（仅有 Git 的 LF/CRLF working-copy 提示，无 whitespace error） |
+
+Final Windows path hardening targeted developer verification：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm test -- tests/production-data-path.test.ts` | RED：旧 validator 对新增 matrix 按预期出现 16 个失败；GREEN：45 passed，当前 Windows developer host 上 2 个既有 POSIX-only mode tests skipped |
 | `npm run typecheck` | 成功；exit 0 |
 | `npm run lint` | 成功；exit 0 |
 | `npm run build:local` | 成功；exit 0 |

@@ -20,13 +20,33 @@ export interface EnsureProductionDataDirectoryOptions {
   readonly platform: NodeJS.Platform;
 }
 
+const WINDOWS_DRIVE_ABSOLUTE_PATH = /^[A-Za-z]:[\\/]/;
+const WINDOWS_UNC_PATH =
+  /^(?:\\\\|\/\/)[^\\/]+[\\/][^\\/]+(?:[\\/].*)?$/;
+const WINDOWS_EXTENDED_DRIVE_PATH = /^\\\\\?\\[A-Za-z]:\\(?:.*)?$/;
+const WINDOWS_EXTENDED_UNC_PATH =
+  /^\\\\\?\\UNC\\[^\\/]+\\[^\\/]+(?:\\.*)?$/i;
+const WINDOWS_NAMESPACE_PATH = /^[\\/]{2}[?.][\\/]/;
+
 function isFullyQualifiedWindowsPath(path: string): boolean {
   if (!win32.isAbsolute(path)) {
     return false;
   }
 
-  const root = win32.parse(path).root;
-  return root !== '\\' && root !== '/';
+  if (
+    WINDOWS_EXTENDED_DRIVE_PATH.test(path) ||
+    WINDOWS_EXTENDED_UNC_PATH.test(path)
+  ) {
+    return true;
+  }
+
+  if (WINDOWS_NAMESPACE_PATH.test(path)) {
+    return false;
+  }
+
+  return (
+    WINDOWS_DRIVE_ABSOLUTE_PATH.test(path) || WINDOWS_UNC_PATH.test(path)
+  );
 }
 
 function requireAbsoluteHomeDirectory(
