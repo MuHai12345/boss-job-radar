@@ -2,9 +2,9 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 2 - PASS`
-- 当前批次：`Phase 2 closeout`
-- 当前状态：`phase_2_pass_phase_3_not_started`
+- 当前阶段：`Phase 3 - IN PROGRESS / NOT YET PASSED`
+- 当前批次：`Phase 3 / Batch 1`
+- 当前状态：`implementation_complete_awaiting_external_review`
 - 已通过的最后 commit：`48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
@@ -30,13 +30,13 @@
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
 - Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
 - 真实页面后台自动采集：仍未开始
-- local service：未开始
-- Phase 3：尚未开始
-- 当前阻塞：Phase 2 无阻塞；Phase 3 等待外部网页版 ChatGPT 单独给出 Batch 1 任务
+- local service：已实现最小 loopback-only HTTP runtime baseline，等待外部审阅
+- Phase 3：`IN PROGRESS / NOT YET PASSED`
+- Phase 3 / Batch 1：`implementation_complete_awaiting_external_review`
+- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 审阅 Phase 3 / Batch 1
 - 权限边界：Codex 无权自行宣布本批次通过或进入下一批
 - 尚未开发或验证：
   - JSON 导出
-  - 本地服务
   - SQLite
   - AI
   - Dashboard
@@ -45,13 +45,13 @@
 
 这里的当前状态只表示：
 
-> 外部网页版 ChatGPT 已基于用户最终真实页面结构化重验作出结论：Phase 2 / Batch 4 `PASS`，Phase 2 `PASS`。Phase 3 尚未开始。
+> 外部网页版 ChatGPT 已基于用户最终真实页面结构化重验作出结论：Phase 2 / Batch 4 `PASS`，Phase 2 `PASS`。Phase 3 / Batch 1 本地服务基线已完成实现，当前等待外部审阅；Phase 3 尚未通过。
 
 该结论不表示：
 
 - verified selector 是 BOSS 官方或永久稳定的 contract；
-- Phase 3 已实现或已经开始；
-- local service、SQLite、AI 或 Dashboard 已实现。
+- Phase 3 已通过；
+- SQLite、扩展桥接、AI 或 Dashboard 已实现。
 
 Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
 
@@ -69,4 +69,4 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
-项目没有真实页面后台自动采集、自动打开详情、JSON 导出、本地服务、数据库、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 尚未开始。
+项目新增了固定绑定 `127.0.0.1` 的最小 Node HTTP 服务，只提供 `GET /health`；host 不可配置，production port 可在严格校验后有限配置。该实现没有 CORS bridge、ingestion、SQLite、局域网或公网监听。项目仍没有真实页面后台自动采集、自动打开详情、JSON 导出、数据库、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 当前为 `IN PROGRESS / NOT YET PASSED`。

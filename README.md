@@ -6,7 +6,7 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 2 / Batch 4 已由外部网页版 ChatGPT 最终验收为 `PASS`，Phase 2 状态为 `PASS`。Phase 3 尚未开始，等待单独的 Batch 1 任务。**
+**Phase 2 已由外部网页版 ChatGPT 最终验收为 `PASS`。Phase 3 / Batch 1 本地 loopback 服务基线已完成实现并等待外部审阅；Phase 3 仍为 `IN PROGRESS / NOT YET PASSED`。**
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -45,8 +45,11 @@ npm run lint
 npm test
 npm run build
 npm run build:edge
+npm run build:local
 npm run verify:manifests
 ```
+
+本地服务 build 后可运行 `npm run start:local`。它固定监听 `127.0.0.1:32123`，只提供 `GET /health`；可用 `BOSS_JOB_RADAR_LOCAL_PORT` 覆盖 port，但 host 不可配置。
 
 构建完成后，可在浏览器扩展管理页面开启开发者模式并选择“加载已解压的扩展”：
 
@@ -64,7 +67,8 @@ npm run verify:manifests
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
-- 当前没有 local service、SQLite、AI 或 Dashboard。
+- 当前本地服务只有 loopback-only `GET /health`，没有 CORS bridge、岗位导入或持久化能力。
+- 当前没有 SQLite、扩展到本地服务的 bridge、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3 尚未开始；其具体 Batch 1 任务需由外部网页版 ChatGPT 单独给出。本仓库不得自行开始 Phase 3。
+Phase 3 / Batch 1 当前等待外部审阅；本仓库不得自行开始 SQLite 或后续批次。
