@@ -31,7 +31,10 @@ try {
     productionDataPaths.dataDirectory,
     ...sensitivePaths,
   ];
-  await ensureProductionDataDirectory(productionDataPaths.dataDirectory);
+  await ensureProductionDataDirectory({
+    dataDirectory: productionDataPaths.dataDirectory,
+    platform: process.platform,
+  });
   const runtime = await startLocalRuntime({
     databasePath: productionDataPaths.databasePath,
     port,

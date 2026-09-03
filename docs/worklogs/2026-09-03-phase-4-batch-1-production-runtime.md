@@ -8,9 +8,17 @@
 - 接手时工作区：干净
 - Phase 3：`PASS`
 - Phase 4：`IN PROGRESS / NOT YET PASSED`
-- Phase 4 / Batch 1：`implementation_complete_awaiting_external_review`
+- Phase 4 / Batch 1：`repair_complete_awaiting_external_re_review`
 
 本轮只实现 production SQLite data path policy、production data directory 创建、SQLite 与 loopback HTTP service 的统一 local runtime lifecycle，以及 production `main.ts` 装配。没有实现 HTTP ingestion、extension bridge、Job identity、dedupe、最终 Job aggregation、SearchRun、AI、rules 或 Dashboard。
+
+## External review repair
+
+- 首轮外部结论：`CHANGES_REQUIRED`
+- repair 基准 commit：`4bc52d2a23149a74ce65444ca589bd23ea797434`
+- Windows `LOCALAPPDATA` 和 fallback home 现要求 fully-qualified Windows path；drive-rooted、UNC 和 Node 可安全处理的 extended absolute path 保留，rooted-without-drive、drive-relative、relative 和空路径 fail closed。
+- macOS / Linux 创建最终 app data directory 时请求 `0700`，并在目录已存在时对最终 `boss-job-radar` directory 执行 `chmod(0700)`；chmod 失败直接向上抛出。Windows 不调用 chmod。
+- 不删除或清空目录，不修改数据库内容，不 chmod 父级用户目录。
 
 ## 完成内容
 
@@ -36,6 +44,16 @@
 | `npm run lint` | 成功；exit 0 |
 | `git diff --check` | 成功；exit 0（仅有 Git 的 LF/CRLF working-copy 提示，无 whitespace error） |
 
+Repair targeted developer verification：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm test -- tests/production-data-path.test.ts` | RED：旧实现按预期出现 8 个失败；GREEN：16 passed，当前 Windows developer host 上 2 个 POSIX-only mode tests skipped |
+| `npm run typecheck` | 成功；exit 0 |
+| `npm run lint` | 成功；exit 0 |
+| `npm run build:local` | 成功；exit 0 |
+| `git diff --check` | 成功；exit 0（仅有 Git 的 LF/CRLF working-copy 提示，无 whitespace error） |
+
 所有新增 runtime tests 使用 OS temp directory 和 ephemeral/released loopback port，结束时关闭 listener、关闭 SQLite 并递归清理 SQLite 文件、sidecars 和临时目录。未运行 `npm run start:local`，没有触碰开发者真实 production app-data directory。
 
 ## 边界与外部审阅
@@ -49,7 +67,7 @@
 - Host permissions：`NOT ADDED`
 - Job dedupe：`NOT IMPLEMENTED`
 - Phase 4：`IN PROGRESS / NOT YET PASSED`
-- Phase 4 / Batch 1：`implementation_complete_awaiting_external_review`
+- Phase 4 / Batch 1：`repair_complete_awaiting_external_re_review`
 - External review：`PENDING`
 
 本日志中的 developer verification 只属于 Codex 实现证据，不等于外部 acceptance，也不宣布本批 `PASS`。

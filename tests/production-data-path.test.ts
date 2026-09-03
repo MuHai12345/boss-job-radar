@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,6 +37,54 @@ describe('production data path policy', () => {
     });
   });
 
+  it('uses a fully-qualified UNC LOCALAPPDATA path on Windows', () => {
+    expect(
+      resolveProductionDataPaths({
+        environment: {
+          LOCALAPPDATA: '\\\\server\\share\\data',
+        },
+        homeDirectory: 'C:\\Users\\Example',
+        platform: 'win32',
+      }),
+    ).toEqual({
+      dataDirectory: '\\\\server\\share\\data\\boss-job-radar',
+      databasePath:
+        '\\\\server\\share\\data\\boss-job-radar\\boss-job-radar.sqlite3',
+    });
+  });
+
+  it('preserves an extended fully-qualified Windows LOCALAPPDATA path', () => {
+    expect(
+      resolveProductionDataPaths({
+        environment: {
+          LOCALAPPDATA: '\\\\?\\C:\\Data',
+        },
+        homeDirectory: 'C:\\Users\\Example',
+        platform: 'win32',
+      }),
+    ).toEqual({
+      dataDirectory: '\\\\?\\C:\\Data\\boss-job-radar',
+      databasePath:
+        '\\\\?\\C:\\Data\\boss-job-radar\\boss-job-radar.sqlite3',
+    });
+  });
+
+  it.each([
+    ['rooted backslash path', '\\foo'],
+    ['rooted forward-slash path', '/foo'],
+    ['drive-relative path', 'C:relative'],
+    ['relative path', 'relative\\data'],
+    ['empty path', ''],
+  ])('rejects a %s in LOCALAPPDATA', (_description, localAppData) => {
+    expect(() =>
+      resolveProductionDataPaths({
+        environment: { LOCALAPPDATA: localAppData },
+        homeDirectory: 'C:\\Users\\Example',
+        platform: 'win32',
+      }),
+    ).toThrow('LOCALAPPDATA must be a fully-qualified Windows path');
+  });
+
   it('falls back to home AppData Local on Windows', () => {
     expect(
       resolveProductionDataPaths({
@@ -50,6 +98,19 @@ describe('production data path policy', () => {
       databasePath:
         'C:\\Users\\Example\\AppData\\Local\\boss-job-radar\\boss-job-radar.sqlite3',
     });
+  });
+
+  it.each([
+    ['rooted path without a drive', '\\Users\\Example'],
+    ['relative path', 'relative'],
+  ])('rejects a %s as the Windows fallback home', (_description, homeDirectory) => {
+    expect(() =>
+      resolveProductionDataPaths({
+        environment: {},
+        homeDirectory,
+        platform: 'win32',
+      }),
+    ).toThrow('Home directory must be a fully-qualified Windows path');
   });
 
   it('uses Library Application Support on macOS', () => {
@@ -110,9 +171,46 @@ describe('production data path policy', () => {
     temporaryDirectories.push(parent);
     const dataDirectory = join(parent, 'nested', 'boss-job-radar');
 
-    await ensureProductionDataDirectory(dataDirectory);
+    await ensureProductionDataDirectory({
+      dataDirectory,
+      platform: process.platform,
+    });
 
     const directoryStats = await stat(dataDirectory);
     expect(directoryStats.isDirectory()).toBe(true);
   });
+
+  it.runIf(process.platform !== 'win32')(
+    'creates the production app directory with permissions 0700 on POSIX',
+    async () => {
+      const parent = await mkdtemp(join(tmpdir(), 'boss-job-radar-data-path-'));
+      temporaryDirectories.push(parent);
+      const dataDirectory = join(parent, 'boss-job-radar');
+
+      await ensureProductionDataDirectory({
+        dataDirectory,
+        platform: process.platform,
+      });
+
+      expect((await stat(dataDirectory)).mode & 0o777).toBe(0o700);
+    },
+  );
+
+  it.runIf(process.platform !== 'win32')(
+    'tightens an existing production app directory to 0700 on POSIX',
+    async () => {
+      const parent = await mkdtemp(join(tmpdir(), 'boss-job-radar-data-path-'));
+      temporaryDirectories.push(parent);
+      const dataDirectory = join(parent, 'boss-job-radar');
+      await mkdir(dataDirectory, { mode: 0o755 });
+      await chmod(dataDirectory, 0o755);
+
+      await ensureProductionDataDirectory({
+        dataDirectory,
+        platform: process.platform,
+      });
+
+      expect((await stat(dataDirectory)).mode & 0o777).toBe(0o700);
+    },
+  );
 });

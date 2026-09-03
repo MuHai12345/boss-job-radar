@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { chmod, mkdir } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
 
 export const APP_DATA_DIRECTORY_NAME = 'boss-job-radar';
@@ -13,6 +13,20 @@ export interface ProductionDataPathOptions {
   readonly environment: Readonly<Record<string, string | undefined>>;
   readonly homeDirectory: string;
   readonly platform: NodeJS.Platform;
+}
+
+export interface EnsureProductionDataDirectoryOptions {
+  readonly dataDirectory: string;
+  readonly platform: NodeJS.Platform;
+}
+
+function isFullyQualifiedWindowsPath(path: string): boolean {
+  if (!win32.isAbsolute(path)) {
+    return false;
+  }
+
+  const root = win32.parse(path).root;
+  return root !== '\\' && root !== '/';
 }
 
 function requireAbsoluteHomeDirectory(
@@ -35,15 +49,18 @@ export function resolveProductionDataPaths(
       joinPath = win32.join;
       const localAppData = options.environment.LOCALAPPDATA;
       if (localAppData !== undefined) {
-        if (!win32.isAbsolute(localAppData)) {
-          throw new Error('LOCALAPPDATA must be an absolute path');
+        if (!isFullyQualifiedWindowsPath(localAppData)) {
+          throw new Error(
+            'LOCALAPPDATA must be a fully-qualified Windows path',
+          );
         }
         dataRoot = localAppData;
       } else {
-        requireAbsoluteHomeDirectory(
-          options.homeDirectory,
-          win32.isAbsolute,
-        );
+        if (!isFullyQualifiedWindowsPath(options.homeDirectory)) {
+          throw new Error(
+            'Home directory must be a fully-qualified Windows path',
+          );
+        }
         dataRoot = win32.join(options.homeDirectory, 'AppData', 'Local');
       }
       break;
@@ -89,7 +106,23 @@ export function resolveProductionDataPaths(
 }
 
 export async function ensureProductionDataDirectory(
-  dataDirectory: string,
+  options: EnsureProductionDataDirectoryOptions,
 ): Promise<void> {
-  await mkdir(dataDirectory, { recursive: true });
+  switch (options.platform) {
+    case 'win32':
+      await mkdir(options.dataDirectory, { recursive: true });
+      return;
+
+    case 'darwin':
+    case 'linux':
+      await mkdir(posix.dirname(options.dataDirectory), { recursive: true });
+      await mkdir(options.dataDirectory, { mode: 0o700, recursive: true });
+      await chmod(options.dataDirectory, 0o700);
+      return;
+
+    default:
+      throw new Error(
+        `Unsupported production platform: ${options.platform}`,
+      );
+  }
 }

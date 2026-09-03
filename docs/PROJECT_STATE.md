@@ -3,7 +3,7 @@
 ## 当前状态快照
 
 - 当前阶段：`Phase 4 / Batch 1`
-- 下一步骤：`Phase 4 / Batch 1 external review`
+- 下一步骤：`Phase 4 / Batch 1 external re-review`
 - 当前状态：`Phase 4 - IN PROGRESS / NOT YET PASSED`
 - 已通过的最后 implementation commit：`05e5b3e6441499a213544b6b6961ecefa765afac`
 - Phase 0：`PASS`
@@ -30,18 +30,18 @@
 - 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction
 - Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
 - 真实页面后台自动采集：仍未开始
-- local service：Phase 3 / Batch 1 已通过外部验收；包含 Node local HTTP service baseline，固定绑定 IPv4 loopback `127.0.0.1`、host 不可配置、只提供 `GET /health`，没有 permissive CORS 或 HTTP ingestion；Phase 4 / Batch 1 已实现与 SQLite 的统一 production runtime lifecycle，等待外部审阅
+- local service：Phase 3 / Batch 1 已通过外部验收；包含 Node local HTTP service baseline，固定绑定 IPv4 loopback `127.0.0.1`、host 不可配置、只提供 `GET /health`，没有 permissive CORS 或 HTTP ingestion；Phase 4 / Batch 1 已实现与 SQLite 的统一 production runtime lifecycle，并完成 production data path 边界 repair，等待外部复审
 - SQLite storage foundation：Phase 3 / Batch 2 已通过外部验收；包含 `better-sqlite3` `13.0.3`、显式 database path 打开、`foreign_keys = ON`、ordered transactional migrations、schema version 1、append-only `job_observations` schema 和 future migration fail-closed；没有 Job identity 或 dedupe
 - observation persistence API：Phase 3 / Batch 3 已通过外部验收；包含有限的 append、get by id、append-only semantics、runtime string-array JSON validation、prepared SQL parameter binding，以及 close / reopen / readback recovery
-- production DB path：Phase 4 / Batch 1 已实现用户级 OS data directory policy，database filename 固定为 `boss-job-radar.sqlite3`，不接受 arbitrary production path override，等待外部审阅
+- production DB path：Phase 4 / Batch 1 已实现用户级 OS data directory policy，database filename 固定为 `boss-job-radar.sqlite3`，不接受 arbitrary production path override；Windows 要求 fully-qualified path，POSIX 最终 app directory 收紧为 `0700`，等待外部复审
 - Phase 3：`PASS`
 - Phase 3 / Batch 1：`PASS`
 - Phase 3 / Batch 2：`PASS`
 - Phase 3 / Batch 3：`PASS`
 - Phase 4：`IN PROGRESS / NOT YET PASSED`
-- Phase 4 / Batch 1：`implementation_complete_awaiting_external_review`
+- Phase 4 / Batch 1：`repair_complete_awaiting_external_re_review`
 - Phase 3 implementation lineage：`b73dc43869764f4bbd4d9de6e22d75acc0baed5f` → `b667eaa222bc065f1faff254e7a2d4c640fbf86d` → `05e5b3e6441499a213544b6b6961ecefa765afac`
-- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 4 / Batch 1
+- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立复审 Phase 4 / Batch 1 repair
 - 权限边界：Codex 无权自行宣布 Phase 4 / Batch 1 `PASS` 或开始下一批
 - 仍未实现：
   - HTTP ingestion
@@ -60,7 +60,7 @@
 
 这里的当前状态只表示：
 
-> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`。Phase 4 / Batch 1 已完成实现并等待外部审阅；Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
+> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`。Phase 4 / Batch 1 首轮外部结论为 `CHANGES_REQUIRED`；两个 production data path 边界 repair 已完成并等待外部复审。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
 
 该结论不表示：
 
@@ -84,4 +84,4 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
-项目包含固定绑定 `127.0.0.1` 的最小 Node HTTP 服务，只提供 `GET /health`；host 不可配置，production port 可在严格校验后有限配置。Batch 2 新增 `better-sqlite3` `13.0.3` 本地存储基础：调用方显式提供 path，打开后启用 foreign keys 并运行 ordered transactional migrations；schema version 1 只包含 append-only `job_observations`。Batch 3 在独立 Node build boundary 内新增 storage-facing `JobObservationInput` / `JobObservationRecord` 和有限 repository，只支持 append 与按 positive safe integer id 读取；事实字符串、null、空字符串与数组顺序原样保持，三个 JSON 字段读取时必须验证为字符串数组。file-backed 测试已覆盖 close、reopen、readback recovery、迁移不重复、重复 observation 分别追加、非法 JSON fail-closed 和 SQL 参数绑定。Phase 4 / Batch 1 新增 production OS data path policy：database 固定命名为 `boss-job-radar.sqlite3`，位于用户级 `boss-job-radar` data directory，不接受 arbitrary production path override；production startup 会创建缺失目录并由统一 runtime 按 SQLite → HTTP 顺序启动、按 HTTP → SQLite 顺序关闭，启动失败时清理已打开资源。项目仍没有 HTTP ingestion、扩展 bridge、Job identity、dedupe、最终 Job 聚合、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 已通过外部验收；Phase 4 / Batch 1 已完成实现并等待外部审阅，尚未获得 `PASS`。
+项目包含固定绑定 `127.0.0.1` 的最小 Node HTTP 服务，只提供 `GET /health`；host 不可配置，production port 可在严格校验后有限配置。Batch 2 新增 `better-sqlite3` `13.0.3` 本地存储基础：调用方显式提供 path，打开后启用 foreign keys 并运行 ordered transactional migrations；schema version 1 只包含 append-only `job_observations`。Batch 3 在独立 Node build boundary 内新增 storage-facing `JobObservationInput` / `JobObservationRecord` 和有限 repository，只支持 append 与按 positive safe integer id 读取；事实字符串、null、空字符串与数组顺序原样保持，三个 JSON 字段读取时必须验证为字符串数组。file-backed 测试已覆盖 close、reopen、readback recovery、迁移不重复、重复 observation 分别追加、非法 JSON fail-closed 和 SQL 参数绑定。Phase 4 / Batch 1 新增 production OS data path policy：database 固定命名为 `boss-job-radar.sqlite3`，位于用户级 `boss-job-radar` data directory，不接受 arbitrary production path override；Windows production root 必须是 fully-qualified path，macOS / Linux 最终 app directory 创建并收紧为 `0700`；production startup 会创建缺失目录并由统一 runtime 按 SQLite → HTTP 顺序启动、按 HTTP → SQLite 顺序关闭，启动失败时清理已打开资源。项目仍没有 HTTP ingestion、扩展 bridge、Job identity、dedupe、最终 Job 聚合、AI 分析或 Dashboard。最终真实页面重验确认 detail tags 已恢复正常可见语义；`fullJdText` / `rawDetailText` 保持 JD scope，canonical job/page URL 正常，`publishedText` 在无可靠 selector 时保持 `null`，`recruiterActivityText` 在 `.boss-active-time` 不存在时保持 `null` 且不从其他状态推断。现有 Targeted tag diagnostic 继续保留，供后续页面变化时人工排查。Phase 3 已通过外部验收；Phase 4 / Batch 1 repair 已完成并等待外部复审，尚未获得 `PASS`。
