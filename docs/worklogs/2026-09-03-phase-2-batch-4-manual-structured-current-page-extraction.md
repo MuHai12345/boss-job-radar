@@ -64,3 +64,10 @@
 - pure `parseVerifiedBossJobDetail` 与 self-contained live `runVerifiedBossStructuredExtraction` 均应用相同语义；generic parser 继续保留原有 `textContent` 行为，search extraction、verified selectors 和其他 detail 字段未改变。
 - 当前状态：`visible_text_repair_implemented_awaiting_external_re-review`。
 - `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。
+
+## Detail tag hidden-node diagnostic
+
+- 重复真实页面验证显示 detail tag 会出现动态变化的隐藏干扰文本。
+- 本轮不再继续猜测或修改 parser repair。
+- 人工 Targeted Probe 已增加有限、脱敏的 detail tag diagnostic。
+- 当前等待外部审阅，并等待用户在真实 BOSS 详情页手动运行 diagnostic。

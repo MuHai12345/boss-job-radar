@@ -2,6 +2,11 @@ import { Window } from 'happy-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runTargetedDomProbe } from '../src/manual-validation/targeted-dom-probe';
+import type { TargetedTagDiagnostic } from '../src/manual-validation/targeted-dom-probe-types';
+
+function tagDiagnostics(): TargetedTagDiagnostic[] {
+  return runTargetedDomProbe().tagDiagnostics ?? [];
+}
 
 function createWindow(url: string, bodyMarkup: string): Window {
   const window = new Window({ url });
@@ -293,6 +298,378 @@ describe('runTargetedDomProbe', () => {
     expect(target?.matchedCount).toBe(2);
     expect(target?.samples).toHaveLength(1);
     expect(target?.samples[0]?.rootTextPreview).toBe('可见职位描述');
+  });
+
+  it.each([
+    ['hidden attribute', 'hidden', 'HIDDEN_ATTRIBUTE', 'hasHiddenAttribute', true],
+    ['display none', 'style="display:none"', 'DISPLAY_NONE', 'display', 'none'],
+    [
+      'visibility hidden',
+      'style="visibility:hidden"',
+      'VISIBILITY_HIDDEN',
+      'visibility',
+      'hidden',
+    ],
+    ['opacity zero', 'style="opacity:0"', 'OPACITY_ZERO', 'opacity', '0'],
+    ['font size zero', 'style="font-size:0"', 'FONT_SIZE_ZERO', 'fontSize', '0px'],
+    ['visible child', '', 'VISIBLE_CHILD', 'hasHiddenAttribute', false],
+  ] as const)(
+    'includes a %s tag descendant and reports its diagnostic state',
+    (_, attribute, text, property, expected) => {
+      createWindow(
+        'https://www.zhipin.com/job_detail/example.html',
+        `<ul class="job-keyword-list"><li>前<span ${attribute}>${text}</span>后</li></ul>`,
+      );
+
+      const diagnostic = tagDiagnostics()[0];
+      const child = diagnostic?.sequence.find(
+        (entry) => entry.nodeType === 'element',
+      );
+
+      expect(child?.textContentPreview).toBe(text);
+      if (property === 'hasHiddenAttribute') {
+        expect(child?.hasHiddenAttribute).toBe(expected);
+      } else {
+        expect(child?.computedStyle?.[property]).toBe(expected);
+      }
+    },
+  );
+
+  it('records tag fields, CSS, geometry, and text-element-text DOM order', () => {
+    const window = createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      `
+        <ul class="job-keyword-list">
+          <li class="keyword">直<span class="noise" aria-hidden="true" style="display:inline;visibility:visible;opacity:1;position:absolute;left:-9px;top:2px;width:3px;height:4px;max-width:5px;max-height:6px;overflow:hidden;clip:rect(0px, 0px, 0px, 0px);clip-path:inset(50%);transform:scale(0);text-indent:-8px;line-height:7px;font-size:16px">kanzhun</span>播运营</li>
+        </ul>
+      `,
+    );
+    const child = window.document.querySelector('.noise');
+    Object.defineProperties(child, {
+      getBoundingClientRect: {
+        value: () => ({ width: 11, height: 12 }),
+      },
+      getClientRects: { value: () => ({ length: 2 }) },
+      offsetWidth: { get: () => 13 },
+      offsetHeight: { get: () => 14 },
+      offsetParent: { get: () => null },
+    });
+
+    const diagnostic = tagDiagnostics()[0];
+    const element = diagnostic?.sequence.find(
+      (entry) => entry.nodeType === 'element',
+    );
+
+    expect(diagnostic).toMatchObject({
+      index: 0,
+      tagName: 'LI',
+      className: 'keyword',
+      directTextNodeSegments: ['直', '播运营'],
+      normalizedDirectText: '直 播运营',
+      textContentPreview: '直kanzhun播运营',
+      childElementCount: 1,
+      truncated: false,
+    });
+    expect(
+      diagnostic?.sequence.map((entry) =>
+        entry.nodeType === 'text'
+          ? `TEXT:${entry.depth}:${entry.textPreview}`
+          : `ELEMENT:${entry.depth}:${entry.tagName}`,
+      ),
+    ).toEqual([
+      'TEXT:1:直',
+      'ELEMENT:1:SPAN',
+      'TEXT:2:kanzhun',
+      'TEXT:1:播运营',
+    ]);
+    expect(element).toMatchObject({
+      depth: 1,
+      tagName: 'SPAN',
+      className: 'noise',
+      hasHiddenAttribute: false,
+      ariaHidden: 'true',
+      textContentPreview: 'kanzhun',
+      computedStyle: {
+        display: 'inline',
+        visibility: 'visible',
+        opacity: '1',
+        fontSize: '16px',
+        lineHeight: '7px',
+        position: 'absolute',
+        left: '-9px',
+        top: '2px',
+        width: '3px',
+        height: '4px',
+        maxWidth: '5px',
+        maxHeight: '6px',
+        overflow: 'hidden',
+        clip: 'rect(0px, 0px, 0px, 0px)',
+        clipPath: 'inset(50%)',
+        transform: 'scale(0)',
+        textIndent: '-8px',
+      },
+      geometry: {
+        boundingClientRect: { width: 11, height: 12 },
+        getClientRectsLength: 2,
+        offsetWidth: 13,
+        offsetHeight: 14,
+        offsetParentIsNull: true,
+      },
+    });
+    expect(element?.styleAttribute).toContain('position:absolute');
+  });
+
+  it('redacts URL contents from the diagnostic style attribute', () => {
+    createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      '<ul class="job-keyword-list"><li><span style="background-image:url(https://example.com/image.png?token=SECRET#PRIVATE);display:none">干扰</span></li></ul>',
+    );
+
+    const element = tagDiagnostics()[0]?.sequence.find(
+      (entry) => entry.nodeType === 'element',
+    );
+
+    expect(element?.styleAttribute).toContain('url([redacted])');
+    expect(element?.styleAttribute).toContain('display:none');
+    expect(element?.styleAttribute).not.toMatch(/example\.com|SECRET|PRIVATE/);
+  });
+
+  it('limits diagnostics to three tags, depth three, forty sequence entries, and 80 characters per text preview', () => {
+    const wideChildren = Array.from(
+      { length: 45 },
+      (_, index) => `<span>${index}-${'字'.repeat(100)}</span>`,
+    ).join('');
+    createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      `<ul class="job-keyword-list">
+        <li>${'根'.repeat(100)}${wideChildren}<div><div><div><span>TOO_DEEP</span></div></div></div></li>
+        <li>标签 2</li><li>标签 3</li><li>标签 4</li>
+      </ul>`,
+    );
+
+    const diagnostics = tagDiagnostics();
+    const first = diagnostics[0];
+
+    expect(diagnostics).toHaveLength(3);
+    expect(first?.sequence).toHaveLength(40);
+    expect(first?.truncated).toBe(true);
+    expect(
+      Math.max(...(first?.sequence.map((entry) => entry.depth) ?? [])),
+    ).toBeLessThanOrEqual(3);
+    expect(first?.textContentPreview).toHaveLength(80);
+    expect(first?.directTextNodeSegments[0]).toHaveLength(80);
+    expect(
+      first?.sequence.every(
+        (entry) =>
+          (entry.nodeType === 'text'
+            ? entry.textPreview.length
+            : entry.textContentPreview.length) <= 80,
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(first)).not.toContain('TOO_DEEP');
+  });
+
+  it('does not expose text below diagnostic depth three through ancestor previews', () => {
+    createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      '<ul class="job-keyword-list"><li>ROOT<div>ONE<div>TWO<div>THREE<span>TOO_DEEP</span></div></div></div></li></ul>',
+    );
+
+    const diagnostic = tagDiagnostics()[0];
+
+    expect(diagnostic?.textContentPreview).toBe('ROOTONETWOTHREE');
+    expect(JSON.stringify(diagnostic)).not.toContain('TOO_DEEP');
+  });
+
+  it('marks truncation and excludes text after exactly forty sequence entries', () => {
+    const firstForty = Array.from({ length: 40 }, () => '<span></span>').join(
+      '',
+    );
+    createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      `<ul class="job-keyword-list"><li>${firstForty}<span>AFTER_LIMIT</span></li></ul>`,
+    );
+
+    const diagnostic = tagDiagnostics()[0];
+
+    expect(diagnostic?.sequence).toHaveLength(40);
+    expect(diagnostic?.truncated).toBe(true);
+    expect(JSON.stringify(diagnostic)).not.toContain('AFTER_LIMIT');
+  });
+
+  it('returns empty diagnostics off detail pages or when the keyword list is absent', () => {
+    createWindow(
+      'https://www.zhipin.com/web/geek/jobs',
+      '<li class="job-card-box">卡片</li>',
+    );
+    expect(tagDiagnostics()).toEqual([]);
+
+    createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      '<div class="job-box">匿名职位描述</div>',
+    );
+    expect(tagDiagnostics()).toEqual([]);
+  });
+
+  it('keeps existing targets unchanged and does not mutate the detail DOM', () => {
+    const window = createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      `
+        <div class="job-tags"><span hidden>NORMAL_TARGET_MUST_HIDE_THIS</span>标签区域</div>
+      `,
+    );
+    const targetsBeforeDiagnosticMarkup = runTargetedDomProbe().targets;
+    window.document.body?.insertAdjacentHTML(
+      'beforeend',
+      '<ul class="job-keyword-list"><li>前<span hidden>DIAGNOSTIC_MUST_INCLUDE_THIS</span>后</li></ul>',
+    );
+    const before = window.document.documentElement.outerHTML;
+
+    const result = runTargetedDomProbe();
+    const jobTagsTarget = result.targets.find(
+      (target) => target.selectorLabel === '.job-tags',
+    );
+
+    expect(JSON.stringify(jobTagsTarget)).not.toContain(
+      'NORMAL_TARGET_MUST_HIDE_THIS',
+    );
+    expect(result.targets).toEqual(targetsBeforeDiagnosticMarkup);
+    expect(JSON.stringify(result.tagDiagnostics)).toContain(
+      'DIAGNOSTIC_MUST_INCLUDE_THIS',
+    );
+    expect(window.document.documentElement.outerHTML).toBe(before);
+  });
+
+  it('uses null fallbacks when diagnostic style and geometry reads fail', () => {
+    const window = createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      '<ul class="job-keyword-list"><li><span class="fragile">节点</span></li></ul>',
+    );
+    const child = window.document.querySelector('.fragile');
+    if (child === null) {
+      throw new Error('Expected a diagnostic child.');
+    }
+    const originalGetComputedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element === child) {
+        throw new Error('computed style unavailable');
+      }
+      return originalGetComputedStyle(element);
+    });
+    Object.defineProperties(child, {
+      getBoundingClientRect: {
+        value: () => {
+          throw new Error('bounding rect unavailable');
+        },
+      },
+      getClientRects: {
+        value: () => {
+          throw new Error('client rects unavailable');
+        },
+      },
+      offsetWidth: {
+        get: () => {
+          throw new Error('offset width unavailable');
+        },
+      },
+      offsetHeight: {
+        get: () => {
+          throw new Error('offset height unavailable');
+        },
+      },
+      offsetParent: {
+        get: () => {
+          throw new Error('offset parent unavailable');
+        },
+      },
+    });
+
+    const element = tagDiagnostics()[0]?.sequence.find(
+      (entry) => entry.nodeType === 'element',
+    );
+
+    expect(element?.computedStyle).toEqual({
+      display: null,
+      visibility: null,
+      opacity: null,
+      fontSize: null,
+      lineHeight: null,
+      position: null,
+      left: null,
+      top: null,
+      width: null,
+      height: null,
+      maxWidth: null,
+      maxHeight: null,
+      overflow: null,
+      clip: null,
+      clipPath: null,
+      transform: null,
+      textIndent: null,
+    });
+    expect(element?.geometry).toEqual({
+      boundingClientRect: { width: null, height: null },
+      getClientRectsLength: null,
+      offsetWidth: null,
+      offsetHeight: null,
+      offsetParentIsNull: null,
+    });
+  });
+
+  it('does not access private state, forms, network, or interaction APIs in detail diagnostics', () => {
+    const window = createWindow(
+      'https://www.zhipin.com/job_detail/example.html',
+      '<ul class="job-keyword-list"><li>只读<span>结构</span><input /></li></ul>',
+    );
+    Object.defineProperty(window.document, 'cookie', {
+      configurable: true,
+      get: () => {
+        throw new Error('document.cookie must not be read');
+      },
+    });
+    for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+      Object.defineProperty(window, storageName, {
+        configurable: true,
+        get: () => {
+          throw new Error(`${storageName} must not be read`);
+        },
+      });
+    }
+    const tag = window.document.querySelector('.job-keyword-list > li');
+    const input = window.document.querySelector('input');
+    if (tag === null || input === null) {
+      throw new Error('Expected diagnostic fixture nodes.');
+    }
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => {
+        throw new Error('input.value must not be read');
+      },
+    });
+    const tagElement = tag as unknown as HTMLElement;
+    const clickSpy = vi.spyOn(tagElement, 'click');
+    const focusSpy = vi.spyOn(tagElement, 'focus');
+    const dispatchSpy = vi.spyOn(tag, 'dispatchEvent');
+    const scrollSpy = vi.fn();
+    Object.defineProperty(tag, 'scrollIntoView', {
+      configurable: true,
+      value: scrollSpy,
+    });
+    const fetchSpy = vi.fn(() => {
+      throw new Error('network must not be used');
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    const before = window.document.documentElement.outerHTML;
+
+    const result = runTargetedDomProbe();
+
+    expect(result.tagDiagnostics).toHaveLength(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(scrollSpy).not.toHaveBeenCalled();
+    expect(window.document.documentElement.outerHTML).toBe(before);
   });
 
   it.each([
