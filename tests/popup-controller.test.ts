@@ -10,6 +10,7 @@ import {
 } from '../entrypoints/popup/popup-controller';
 import type { ManualDomProbeResult } from '../src/manual-validation/dom-probe-types';
 import type { TargetedDomProbeResult } from '../src/manual-validation/targeted-dom-probe-types';
+import type { StructuredPageExtractionResult } from '../src/page-extraction/structured-page-extraction-types';
 
 const popupHtml = readFileSync(
   fileURLToPath(new URL('../entrypoints/popup/index.html', import.meta.url)),
@@ -50,6 +51,16 @@ const targetedProbeResult: TargetedDomProbeResult = {
   warnings: [],
 };
 
+const structuredExtractionResult: StructuredPageExtractionResult = {
+  pageType: 'search_results',
+  pageUrl: 'https://www.zhipin.com/web/geek/jobs',
+  capturedAt: '2026-09-02T00:00:00.000Z',
+  matchedCardCount: 1,
+  cards: [],
+  detail: null,
+  warnings: [],
+};
+
 function createPopupDocument(): Document {
   const window = new Window();
   window.document.write(popupHtml);
@@ -72,6 +83,12 @@ describe('popup controller', () => {
     expect(document.body.textContent).toContain(
       '仅分析已人工确认的岗位相关 DOM 区域，不自动点击、不滚动、不保存、不上传。',
     );
+    expect(document.body.textContent).toContain('解析当前岗位数据');
+    expect(document.body.textContent).toContain(
+      '只读取当前已打开页面中已验证的岗位字段，不自动点击、不滚动、不翻页、不保存、不上传。',
+    );
+    expect(document.body.textContent).toContain('用户点击后解析当前页面');
+    expect(document.body.textContent).not.toContain('当前尚未开始采集');
   });
 
   it('does not execute on popup open and hides the action on a non-BOSS page', async () => {
@@ -79,6 +96,7 @@ describe('popup controller', () => {
     const elements = findPopupElements(document);
     const executeProbe = vi.fn();
     const executeTargetedProbe = vi.fn();
+    const executeStructuredExtraction = vi.fn();
 
     expect(elements).not.toBeNull();
     await initializePopup(elements!, {
@@ -86,10 +104,12 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 3, url: 'https://example.com/' }),
       executeProbe,
       executeTargetedProbe,
+      executeStructuredExtraction,
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
     expect(executeTargetedProbe).not.toHaveBeenCalled();
+    expect(executeStructuredExtraction).not.toHaveBeenCalled();
     expect(elements?.pageStatus.textContent).toBe('非BOSS直聘页面');
     expect(elements?.action.hidden).toBe(true);
     expect(elements?.button.disabled).toBe(true);
@@ -105,6 +125,7 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 7, url: probeResult.pageUrl }),
       executeProbe,
       executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi.fn(),
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
@@ -130,6 +151,7 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 7, url: probeResult.pageUrl }),
       executeProbe,
       executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi.fn(),
     });
 
     elements.button.click();
@@ -158,6 +180,7 @@ describe('popup controller', () => {
       getActiveTab,
       executeProbe,
       executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi.fn(),
     });
 
     elements.button.click();
@@ -186,6 +209,7 @@ describe('popup controller', () => {
         warnings: [warning],
       }),
       executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi.fn(),
     });
 
     elements.button.click();
@@ -206,6 +230,7 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 7, url: 'https://www.zhipin.com/' }),
       executeProbe: vi.fn(),
       executeTargetedProbe,
+      executeStructuredExtraction: vi.fn(),
     });
 
     expect(elements.action.hidden).toBe(false);
@@ -225,6 +250,7 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 7, url: targetedProbeResult.pageUrl }),
       executeProbe,
       executeTargetedProbe,
+      executeStructuredExtraction: vi.fn(),
     });
 
     expect(executeTargetedProbe).not.toHaveBeenCalled();
@@ -257,6 +283,7 @@ describe('popup controller', () => {
       getActiveTab,
       executeProbe: vi.fn(),
       executeTargetedProbe,
+      executeStructuredExtraction: vi.fn(),
     });
 
     elements.targetedButton.click();
@@ -293,6 +320,7 @@ describe('popup controller', () => {
       getActiveTab: async () => ({ id: 7, url: targetedProbeResult.pageUrl }),
       executeProbe,
       executeTargetedProbe,
+      executeStructuredExtraction: vi.fn(),
     });
 
     elements.button.click();
@@ -315,5 +343,126 @@ describe('popup controller', () => {
       expect(elements.button.disabled).toBe(false);
       expect(elements.targetedButton.disabled).toBe(false);
     });
+  });
+
+  it('does not extract on popup open and keeps structured extraction hidden on BOSS home', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeStructuredExtraction = vi.fn();
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({ id: 7, url: 'https://www.zhipin.com/' }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction,
+    });
+
+    expect(executeStructuredExtraction).not.toHaveBeenCalled();
+    expect(elements.structuredAction.hidden).toBe(true);
+    expect(elements.structuredButton.disabled).toBe(true);
+  });
+
+  it('runs structured extraction only after a click and displays separate JSON', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeProbe = vi.fn();
+    const executeTargetedProbe = vi.fn();
+    const executeStructuredExtraction = vi
+      .fn()
+      .mockResolvedValue(structuredExtractionResult);
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: structuredExtractionResult.pageUrl,
+      }),
+      executeProbe,
+      executeTargetedProbe,
+      executeStructuredExtraction,
+    });
+
+    expect(executeStructuredExtraction).not.toHaveBeenCalled();
+    expect(elements.structuredAction.hidden).toBe(false);
+    expect(elements.structuredButton.disabled).toBe(false);
+
+    elements.structuredButton.click();
+    await vi.waitFor(() =>
+      expect(elements.structuredResult.hidden).toBe(false),
+    );
+
+    expect(executeStructuredExtraction).toHaveBeenCalledTimes(1);
+    expect(executeProbe).not.toHaveBeenCalled();
+    expect(executeTargetedProbe).not.toHaveBeenCalled();
+    expect(JSON.parse(elements.structuredOutput.textContent ?? '')).toEqual(
+      structuredExtractionResult,
+    );
+    expect(elements.structuredStatus.textContent).toBe('当前岗位数据解析完成。');
+    expect(elements.result.hidden).toBe(true);
+    expect(elements.targetedResult.hidden).toBe(true);
+  });
+
+  it('rechecks structured extraction support at click time', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const executeStructuredExtraction = vi.fn();
+    const getActiveTab = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 7, url: structuredExtractionResult.pageUrl })
+      .mockResolvedValueOnce({ id: 7, url: 'https://www.zhipin.com/' });
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab,
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction,
+    });
+
+    elements.structuredButton.click();
+    await vi.waitFor(() =>
+      expect(elements.structuredStatus.textContent).toContain(
+        '仅支持岗位搜索结果页或独立岗位详情页',
+      ),
+    );
+
+    expect(getActiveTab).toHaveBeenCalledTimes(2);
+    expect(executeStructuredExtraction).not.toHaveBeenCalled();
+  });
+
+  it('prevents duplicate structured extraction while a request is in flight', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    let resolveExtraction!: (value: StructuredPageExtractionResult) => void;
+    const executeStructuredExtraction = vi.fn(
+      () =>
+        new Promise<StructuredPageExtractionResult>((resolve) => {
+          resolveExtraction = resolve;
+        }),
+    );
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: structuredExtractionResult.pageUrl,
+      }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction,
+    });
+
+    elements.structuredButton.click();
+    elements.structuredButton.click();
+    await vi.waitFor(() =>
+      expect(executeStructuredExtraction).toHaveBeenCalledTimes(1),
+    );
+    expect(elements.structuredButton.disabled).toBe(true);
+
+    resolveExtraction(structuredExtractionResult);
+    await vi.waitFor(() =>
+      expect(elements.structuredButton.disabled).toBe(false),
+    );
   });
 });

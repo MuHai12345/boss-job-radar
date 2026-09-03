@@ -6,11 +6,13 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-当前处于 **Phase 2 / Batch 3：verified real selector profiles and parser integration**，状态为 `implementation_complete_awaiting_external_review`。
+当前处于 **Phase 2 / Batch 4：manual structured current-page extraction bridge**，状态为 `implementation_complete_awaiting_external_review`。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
 打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。通用 Probe 保留“人工验证当前页面”按钮；Targeted Probe 的“深度验证岗位结构”按钮只在 `/web/geek/jobs` 或 `/job_detail/*.html` 页面显示，并且在点击当刻重新验证活动标签页。结果分别显示在 popup，不自动保存、不自动复制、不上传，也不发起网络请求。
+
+新增 **Manual Structured Current-Page Extraction**：“解析当前岗位数据”仅在 `/web/geek/jobs` 或单层 `/job_detail/*.html` 页面可用，并且必须由用户点击。它只读取当前 DOM 中已验证的岗位字段，结果暂时只显示为 popup JSON；不保存、不上传、不自动导航、不自动浏览，也不是后台采集器。
 
 Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 roots，并以固定节点、深度和文本上限输出结构摘要。用户已完成搜索页和多个详情页的人工 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对；仓库现包含与 synthetic profiles 分离的 verified BOSS selector profiles，以及由脱敏 real-shape fixtures 驱动的纯 parser 测试。
 
@@ -56,10 +58,10 @@ npm run verify:manifests
 - 搜索城市固定为上海，核心方向是电商运营入门岗位。
 - 追求高召回，低分或信息不完整岗位只能被降级或标记，不能被静默隐藏。
 - 只读取用户当前页面已经存在且任务明确允许的 DOM，不调用 BOSS 私有 API。
-- 通用和 Targeted DOM Probe 都只在用户点击对应按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
+- 通用 DOM Probe、Targeted DOM Probe 和结构化当前页解析都只在用户点击对应按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
-- 不自动采集真实页面，不自动打开岗位详情，不自动点击“查看更多信息”。
+- 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
 - 当前没有 local service、SQLite、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 

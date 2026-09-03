@@ -24,7 +24,7 @@
         </div>
         <div class="status-row">
           <dt>功能状态</dt>
-          <dd>当前尚未开始采集</dd>
+          <dd>支持用户点击后解析当前页面</dd>
         </div>
       </dl>
 
@@ -54,6 +54,21 @@
         ></p>
       </section>
 
+      <section class="probe-action" data-structured-extraction-action hidden>
+        <h2>当前岗位结构化解析</h2>
+        <p class="privacy-note">
+          只读取当前已打开页面中已验证的岗位字段，不自动点击、不滚动、不翻页、不保存、不上传。
+        </p>
+        <button type="button" data-structured-extraction-button disabled>
+          解析当前岗位数据
+        </button>
+        <p
+          class="probe-status"
+          data-structured-extraction-status
+          aria-live="polite"
+        ></p>
+      </section>
+
       <section class="probe-result" data-probe-result hidden>
         <h2>结构诊断结果</h2>
         <p class="share-warning">
@@ -68,6 +83,14 @@
           请在发送给 ChatGPT 前自行确认内容中没有不希望分享的信息。
         </p>
         <pre data-targeted-probe-output tabindex="0"></pre>
+      </section>
+
+      <section class="probe-result" data-structured-extraction-result hidden>
+        <h2>当前岗位结构化数据</h2>
+        <p class="share-warning">
+          结果仅显示在当前 popup；关闭后消失，不保存、不上传。
+        </p>
+        <pre data-structured-extraction-output tabindex="0"></pre>
       </section>
 
       <p class="scope-note">

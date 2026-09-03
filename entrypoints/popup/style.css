@@ -100,7 +100,8 @@ dd {
 }
 
 [data-manual-probe-button],
-[data-targeted-probe-button] {
+[data-targeted-probe-button],
+[data-structured-extraction-button] {
   width: 100%;
   border: 0;
   border-radius: 6px;
@@ -114,7 +115,8 @@ dd {
 }
 
 [data-manual-probe-button]:disabled,
-[data-targeted-probe-button]:disabled {
+[data-targeted-probe-button]:disabled,
+[data-structured-extraction-button]:disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -130,7 +132,8 @@ dd {
 }
 
 [data-probe-output],
-[data-targeted-probe-output] {
+[data-targeted-probe-output],
+[data-structured-extraction-output] {
   max-height: 280px;
   margin: 0;
   overflow: auto;

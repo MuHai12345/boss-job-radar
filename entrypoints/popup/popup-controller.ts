@@ -11,6 +11,12 @@ import {
   requestTargetedDomProbe,
   type ExecuteTargetedProbe,
 } from '../../src/manual-validation/targeted-probe-request';
+import {
+  classifyStructuredPageExtractionUrl,
+  requestStructuredPageExtraction,
+  type ExecuteStructuredPageExtraction,
+} from '../../src/page-extraction/structured-page-extraction-request';
+import type { StructuredPageExtractionResult } from '../../src/page-extraction/structured-page-extraction-types';
 
 export interface PopupElements {
   pageStatus: HTMLElement;
@@ -25,6 +31,11 @@ export interface PopupElements {
   targetedStatus: HTMLElement;
   targetedResult: HTMLElement;
   targetedOutput: HTMLElement;
+  structuredAction: HTMLElement;
+  structuredButton: HTMLButtonElement;
+  structuredStatus: HTMLElement;
+  structuredResult: HTMLElement;
+  structuredOutput: HTMLElement;
 }
 
 export interface PopupDependencies {
@@ -32,6 +43,7 @@ export interface PopupDependencies {
   getActiveTab: () => Promise<ManualProbeTab | undefined>;
   executeProbe: ExecuteManualProbe;
   executeTargetedProbe: ExecuteTargetedProbe;
+  executeStructuredExtraction: ExecuteStructuredPageExtraction;
 }
 
 const pageStatusLabels: Record<PageKind, string> = {
@@ -63,6 +75,21 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
   const targetedOutput = root.querySelector<HTMLElement>(
     '[data-targeted-probe-output]',
   );
+  const structuredAction = root.querySelector<HTMLElement>(
+    '[data-structured-extraction-action]',
+  );
+  const structuredButton = root.querySelector<HTMLButtonElement>(
+    '[data-structured-extraction-button]',
+  );
+  const structuredStatus = root.querySelector<HTMLElement>(
+    '[data-structured-extraction-status]',
+  );
+  const structuredResult = root.querySelector<HTMLElement>(
+    '[data-structured-extraction-result]',
+  );
+  const structuredOutput = root.querySelector<HTMLElement>(
+    '[data-structured-extraction-output]',
+  );
 
   return pageStatus &&
     version &&
@@ -75,7 +102,12 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
     targetedButton &&
     targetedStatus &&
     targetedResult &&
-    targetedOutput
+    targetedOutput &&
+    structuredAction &&
+    structuredButton &&
+    structuredStatus &&
+    structuredResult &&
+    structuredOutput
     ? {
         pageStatus,
         version,
@@ -89,6 +121,11 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
         targetedStatus,
         targetedResult,
         targetedOutput,
+        structuredAction,
+        structuredButton,
+        structuredStatus,
+        structuredResult,
+        structuredOutput,
       }
     : null;
 }
@@ -110,22 +147,34 @@ export async function initializePopup(
     targetedStatus,
     targetedResult,
     targetedOutput,
+    structuredAction,
+    structuredButton,
+    structuredStatus,
+    structuredResult,
+    structuredOutput,
   } = elements;
   version.textContent = dependencies.version;
   action.hidden = true;
   button.disabled = true;
   targetedAction.hidden = true;
   targetedButton.disabled = true;
+  structuredAction.hidden = true;
+  structuredButton.disabled = true;
   result.hidden = true;
   output.textContent = '';
   targetedResult.hidden = true;
   targetedOutput.textContent = '';
+  structuredResult.hidden = true;
+  structuredOutput.textContent = '';
   let manualProbeInFlight = false;
   let targetedProbeInFlight = false;
+  let structuredExtractionInFlight = false;
 
   function applyPageState(tab: ManualProbeTab): void {
     const classification = classifyPageUrl(tab.url);
     const targetedClassification = classifyTargetedProbeUrl(tab.url);
+    const structuredClassification =
+      classifyStructuredPageExtractionUrl(tab.url);
     pageStatus.textContent = pageStatusLabels[classification.kind];
     pageStatus.dataset.kind = classification.kind;
     action.hidden = classification.kind !== 'boss';
@@ -134,6 +183,9 @@ export async function initializePopup(
     targetedAction.hidden = !targetedClassification.supported;
     targetedButton.disabled =
       !targetedClassification.supported || targetedProbeInFlight;
+    structuredAction.hidden = !structuredClassification.supported;
+    structuredButton.disabled =
+      !structuredClassification.supported || structuredExtractionInFlight;
   }
 
   button.addEventListener('click', () => {
@@ -231,6 +283,55 @@ export async function initializePopup(
     })();
   });
 
+  structuredButton.addEventListener('click', () => {
+    if (structuredExtractionInFlight) {
+      return;
+    }
+    structuredExtractionInFlight = true;
+    structuredButton.disabled = true;
+    structuredStatus.textContent = '正在解析当前页面已验证的岗位字段…';
+    structuredResult.hidden = true;
+    structuredOutput.textContent = '';
+
+    void (async () => {
+      let currentTab: ManualProbeTab | undefined;
+      try {
+        currentTab = (await dependencies.getActiveTab()) ?? {};
+        applyPageState(currentTab);
+        const outcome = await requestStructuredPageExtraction(
+          currentTab,
+          dependencies.executeStructuredExtraction,
+        );
+
+        if (outcome.ok) {
+          structuredStatus.textContent = outcome.result.warnings.includes(
+            'body_missing',
+          )
+            ? '结构化解析已执行，但当前页面没有 document.body。'
+            : outcome.result.warnings.includes('no_job_cards')
+              ? '结构化解析已执行，但当前页面没有发现岗位卡片。'
+              : outcome.result.warnings.includes('card_limit_reached')
+                ? '当前岗位数据解析完成；匹配超过 100 张卡片，仅解析前 100 张。'
+                : '当前岗位数据解析完成。';
+          structuredOutput.textContent = JSON.stringify(outcome.result, null, 2);
+          structuredResult.hidden = false;
+        } else {
+          structuredStatus.textContent = outcome.message;
+        }
+      } catch {
+        structuredStatus.textContent =
+          '无法重新确认当前页面，请关闭扩展弹窗后重试。';
+      } finally {
+        structuredExtractionInFlight = false;
+        if (currentTab === undefined) {
+          structuredButton.disabled = false;
+        } else {
+          applyPageState(currentTab);
+        }
+      }
+    })();
+  });
+
   try {
     const activeTab = (await dependencies.getActiveTab()) ?? {};
     applyPageState(activeTab);
@@ -242,3 +343,4 @@ export async function initializePopup(
 
 export type { ManualDomProbeResult };
 export type { TargetedDomProbeResult };
+export type { StructuredPageExtractionResult };
