@@ -262,6 +262,50 @@ describe('runVerifiedBossStructuredExtraction job detail', () => {
     expect(JSON.stringify(detail)).not.toContain('recommended-a.html');
   });
 
+  it('cleans verified detail tag attribution and preserves parser equivalence', () => {
+    const pageUrl =
+      'https://www.zhipin.com/job_detail/example-tag-attribution.html';
+    const window = createFixtureWindow(
+      pageUrl,
+      'job-detail-tag-attribution.html',
+    );
+    const reference = parseVerifiedBossJobDetail(
+      window.document as unknown as Document,
+      { currentPageUrl: pageUrl },
+    );
+
+    const detail = runVerifiedBossStructuredExtraction(profiles).detail;
+
+    expect(reference.tags).toEqual(['直播电商', '电商运营', '常规标签']);
+    expect(detail?.tags).toEqual(reference.tags);
+    expect(detail?.missingFields).toEqual(reference.missingFields);
+  });
+
+  it('drops attribution-only live detail tags and reports the field missing', () => {
+    const pageUrl =
+      'https://www.zhipin.com/job_detail/example-tag-attribution.html';
+    const window = createFixtureWindow(
+      pageUrl,
+      'job-detail-tag-attribution.html',
+    );
+    const tagList = window.document.querySelector('.job-keyword-list');
+    if (tagList === null) {
+      throw new Error('Expected the synthetic tag list fixture.');
+    }
+    tagList.innerHTML = '<li> 来自BOSS直聘 </li>';
+    const reference = parseVerifiedBossJobDetail(
+      window.document as unknown as Document,
+      { currentPageUrl: pageUrl },
+    );
+
+    const detail = runVerifiedBossStructuredExtraction(profiles).detail;
+
+    expect(reference.tags).toEqual([]);
+    expect(detail?.tags).toEqual(reference.tags);
+    expect(detail?.missingFields).toEqual(reference.missingFields);
+    expect(detail?.missingFields).toContain('tags');
+  });
+
   it('does not read private browser state, send network requests, or mutate DOM', () => {
     const window = createFixtureWindow(
       'https://www.zhipin.com/job_detail/example-a.html',

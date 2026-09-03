@@ -23,6 +23,12 @@ function normalizeText(value: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
+function normalizeVerifiedBossDetailTagText(
+  value: string | null | undefined,
+): string | null {
+  return normalizeText(value?.replaceAll('来自BOSS直聘', ''));
+}
+
 function normalizeBaseUrl(baseUrl: string | undefined): string | null {
   if (baseUrl === undefined) {
     return null;
@@ -108,10 +114,11 @@ function readRootText(root: Document | Element): string {
   return normalizeText(textContent) ?? '';
 }
 
-export function parseJobDetail(
+function parseJobDetailWithTagTextNormalizer(
   root: Document | Element,
   profile: JobDetailSelectorProfile,
-  options: ParseJobDetailOptions = {},
+  options: ParseJobDetailOptions,
+  normalizeTagText: (value: string | null | undefined) => string | null,
 ): ParsedJobDetail {
   const title = readText(root, profile.title);
   const companyName = readText(root, profile.company);
@@ -122,7 +129,7 @@ export function parseJobDetail(
   const tags = Array.from(
     profile.tags === null ? [] : root.querySelectorAll(profile.tags),
   )
-    .map((tag) => normalizeText(tag.textContent))
+    .map((tag) => normalizeTagText(tag.textContent))
     .filter((tag): tag is string => tag !== null);
   const link = profile.link === null ? null : root.querySelector(profile.link);
   const hrefAttribute = link?.getAttribute('href') ?? null;
@@ -219,12 +226,30 @@ export function parseJobDetail(
   };
 }
 
+export function parseJobDetail(
+  root: Document | Element,
+  profile: JobDetailSelectorProfile,
+  options: ParseJobDetailOptions = {},
+): ParsedJobDetail {
+  return parseJobDetailWithTagTextNormalizer(
+    root,
+    profile,
+    options,
+    normalizeText,
+  );
+}
+
 export function parseVerifiedBossJobDetail(
   root: Document | Element,
   options: ParseJobDetailOptions = {},
 ): ParsedJobDetail {
-  return parseJobDetail(root, verifiedBossJobDetailSelectorProfile, {
-    ...options,
-    rawDetailSelector: verifiedBossJobDetailSelectorProfile.fullJd,
-  });
+  return parseJobDetailWithTagTextNormalizer(
+    root,
+    verifiedBossJobDetailSelectorProfile,
+    {
+      ...options,
+      rawDetailSelector: verifiedBossJobDetailSelectorProfile.fullJd,
+    },
+    normalizeVerifiedBossDetailTagText,
+  );
 }

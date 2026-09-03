@@ -45,3 +45,13 @@
 - 未新增 network request、BOSS private API、storage、SQLite、localhost service、AI、Dashboard、salary mapping 接入、自动滚动、自动翻页、自动点击、自动打开详情、MutationObserver、自动投递或自动聊天。
 
 本工作日志只记录实现和开发验证事实，不构成 Phase 2 / Batch 4 外部验收结论。
+
+## Real page detail tag attribution repair
+
+- 外部网页版 ChatGPT 首轮审阅与用户真实页面验证确认：verified detail tags 可能被固定平台 attribution `来自BOSS直聘` 插入文本中间并污染语义文本。
+- 根因是 pure verified detail parser 与 live structured extractor 均直接归一化 `tag.textContent`，没有先移除该已确认 marker。
+- repair 仅在两条 verified detail 路径中移除固定 marker，再执行原有 whitespace normalization；清理后为空的 tag 不进入结果，并继续通过 `missingFields` 报告整体 tags 缺失。
+- verified selector、search extraction、generic/synthetic parser、URL policy 和其他字段处理均未改变。
+- 使用匿名 synthetic fixture 覆盖文本中间 marker、多个 tag、attribution-only tag、正常 tag、pure/live 输出和 reference equivalence；未写入用户真实公司、URL、JD 或招聘者信息。
+- 当前状态：`repair_implemented_awaiting_external_re-review`。
+- `REAL BOSS PAGE RE-VALIDATION: NOT PERFORMED`。

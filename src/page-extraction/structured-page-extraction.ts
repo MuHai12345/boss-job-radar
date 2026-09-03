@@ -13,6 +13,7 @@ export function runVerifiedBossStructuredExtraction(
   profiles: VerifiedBossSelectorProfiles,
 ): StructuredPageExtractionResult {
   const cardLimit = 100;
+  const verifiedBossDetailTagAttributionMarker = '来自BOSS直聘';
   const blockElementNames = new Set([
     'ARTICLE',
     'BLOCKQUOTE',
@@ -257,7 +258,14 @@ export function runVerifiedBossStructuredExtraction(
     const tags = Array.from(
       profile.tags === null ? [] : root.querySelectorAll(profile.tags),
     )
-      .map((tag) => normalizeText(tag.textContent))
+      .map((tag) =>
+        normalizeText(
+          tag.textContent?.replaceAll(
+            verifiedBossDetailTagAttributionMarker,
+            '',
+          ),
+        ),
+      )
       .filter((tag): tag is string => tag !== null);
     const recruiterActivityText = readText(root, profile.recruiterActivity);
     const publishedText = readText(root, profile.published);

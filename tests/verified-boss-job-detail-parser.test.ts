@@ -142,6 +142,36 @@ describe('verifiedBossJobDetailSelectorProfile', () => {
     }
   });
 
+  it('removes the verified BOSS attribution marker from tags before whitespace normalization', () => {
+    const detail = parseVerifiedBossJobDetail(
+      fixtureDocument('job-detail-tag-attribution.html'),
+      {
+        currentPageUrl:
+          'https://www.zhipin.com/job_detail/example-tag-attribution.html',
+      },
+    );
+
+    expect(detail.tags).toEqual(['直播电商', '电商运营', '常规标签']);
+    expect(detail.missingFields).not.toContain('tags');
+  });
+
+  it('drops verified tags that contain only the attribution marker', () => {
+    const document = fixtureDocument('job-detail-tag-attribution.html');
+    const tagList = document.querySelector('.job-keyword-list');
+    if (tagList === null) {
+      throw new Error('Expected the synthetic tag list fixture.');
+    }
+    tagList.innerHTML = '<li> 来自BOSS直聘 </li><li>来自BOSS直聘</li>';
+
+    const detail = parseVerifiedBossJobDetail(document, {
+      currentPageUrl:
+        'https://www.zhipin.com/job_detail/example-tag-attribution.html',
+    });
+
+    expect(detail.tags).toEqual([]);
+    expect(detail.missingFields).toContain('tags');
+  });
+
   it.each([
     'https://evil.example/job_detail/example-a.html',
     'https://user:password@www.zhipin.com/job_detail/example-a.html',
