@@ -11,6 +11,7 @@ import {
 import type { ManualDomProbeResult } from '../src/manual-validation/dom-probe-types';
 import type { TargetedDomProbeResult } from '../src/manual-validation/targeted-dom-probe-types';
 import type { StructuredPageExtractionResult } from '../src/page-extraction/structured-page-extraction-types';
+import type { JobObservationInput } from '../src/shared/job-observation-types';
 
 const popupHtml = readFileSync(
   fileURLToPath(new URL('../entrypoints/popup/index.html', import.meta.url)),
@@ -61,11 +62,39 @@ const structuredExtractionResult: StructuredPageExtractionResult = {
   warnings: [],
 };
 
+const savableExtractionResult: StructuredPageExtractionResult = {
+  ...structuredExtractionResult,
+  cards: [
+    {
+      title: '保存用岗位',
+      companyName: '保存用公司',
+      salaryText: '',
+      locationText: '上海',
+      experienceText: null,
+      educationText: null,
+      tags: ['电商', '电商'],
+      jobHrefRaw: '/job_detail/save.html',
+      jobUrl: 'https://www.zhipin.com/job_detail/save.html',
+      recruiterActivityText: null,
+      publishedText: null,
+      rawCardText: '保存用原始文本',
+      missingFields: ['experienceText'],
+      warnings: [],
+    },
+  ],
+};
+
 function createPopupDocument(): Document {
   const window = new Window();
   window.document.write(popupHtml);
   window.document.close();
   return window.document as unknown as Document;
+}
+
+async function successfulNoopSave(
+  observations: readonly JobObservationInput[],
+): Promise<{ readonly ok: true; readonly count: number }> {
+  return { ok: true, count: observations.length };
 }
 
 describe('popup controller', () => {
@@ -105,6 +134,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe,
       executeStructuredExtraction,
+      saveObservations: successfulNoopSave,
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
@@ -126,6 +156,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     expect(executeProbe).not.toHaveBeenCalled();
@@ -152,6 +183,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     elements.button.click();
@@ -181,6 +213,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     elements.button.click();
@@ -210,6 +243,7 @@ describe('popup controller', () => {
       }),
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     elements.button.click();
@@ -231,6 +265,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe,
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     expect(elements.action.hidden).toBe(false);
@@ -251,6 +286,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe,
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     expect(executeTargetedProbe).not.toHaveBeenCalled();
@@ -284,6 +320,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe,
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     elements.targetedButton.click();
@@ -321,6 +358,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe,
       executeStructuredExtraction: vi.fn(),
+      saveObservations: successfulNoopSave,
     });
 
     elements.button.click();
@@ -356,6 +394,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction,
+      saveObservations: successfulNoopSave,
     });
 
     expect(executeStructuredExtraction).not.toHaveBeenCalled();
@@ -381,6 +420,7 @@ describe('popup controller', () => {
       executeProbe,
       executeTargetedProbe,
       executeStructuredExtraction,
+      saveObservations: successfulNoopSave,
     });
 
     expect(executeStructuredExtraction).not.toHaveBeenCalled();
@@ -418,6 +458,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction,
+      saveObservations: successfulNoopSave,
     });
 
     elements.structuredButton.click();
@@ -451,6 +492,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction,
+      saveObservations: successfulNoopSave,
     });
 
     elements.structuredButton.click();
@@ -463,6 +505,201 @@ describe('popup controller', () => {
     resolveExtraction(structuredExtractionResult);
     await vi.waitFor(() =>
       expect(elements.structuredButton.disabled).toBe(false),
+    );
+  });
+
+  it('does not connect to localhost during initialization or parse-only', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const saveObservations = vi.fn();
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: savableExtractionResult.pageUrl,
+      }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi
+        .fn()
+        .mockResolvedValue(savableExtractionResult),
+      saveObservations,
+    });
+
+    expect(saveObservations).not.toHaveBeenCalled();
+    elements.structuredButton.click();
+    await vi.waitFor(() => expect(elements.structuredResult.hidden).toBe(false));
+    expect(saveObservations).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('保存当前岗位数据到本地');
+  });
+
+  it('freshly rechecks the active tab and extracts again before saving', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const firstResult = {
+      ...savableExtractionResult,
+      cards: [
+        {
+          ...savableExtractionResult.cards[0]!,
+          title: '岗位 A',
+          rawCardText: '岗位 A raw',
+        },
+      ],
+    };
+    const secondResult = {
+      ...savableExtractionResult,
+      pageUrl: 'https://www.zhipin.com/web/geek/jobs',
+      cards: [
+        {
+          ...savableExtractionResult.cards[0]!,
+          title: '岗位 B',
+          rawCardText: '岗位 B raw',
+        },
+      ],
+    };
+    const getActiveTab = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 7, url: firstResult.pageUrl })
+      .mockResolvedValueOnce({ id: 7, url: firstResult.pageUrl })
+      .mockResolvedValueOnce({ id: 8, url: secondResult.pageUrl });
+    const executeStructuredExtraction = vi
+      .fn()
+      .mockResolvedValueOnce(firstResult)
+      .mockResolvedValueOnce(secondResult);
+    const saveObservations = vi.fn().mockResolvedValue({ ok: true, count: 1 });
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab,
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction,
+      saveObservations,
+    });
+
+    elements.structuredButton.click();
+    await vi.waitFor(() => expect(elements.structuredResult.hidden).toBe(false));
+    elements.saveButton.click();
+    await vi.waitFor(() => expect(saveObservations).toHaveBeenCalledTimes(1));
+
+    expect(getActiveTab).toHaveBeenCalledTimes(3);
+    expect(executeStructuredExtraction).toHaveBeenNthCalledWith(1, 7);
+    expect(executeStructuredExtraction).toHaveBeenNthCalledWith(2, 8);
+    expect(saveObservations.mock.calls[0]?.[0]).toMatchObject([
+      { title: '岗位 B', rawText: '岗位 B raw' },
+    ]);
+    expect(elements.saveStatus.textContent).toBe('已保存 1 条岗位记录到本地。');
+  });
+
+  it('does not connect when fresh extraction has no savable data', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const saveObservations = vi.fn();
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: structuredExtractionResult.pageUrl,
+      }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi
+        .fn()
+        .mockResolvedValue(structuredExtractionResult),
+      saveObservations,
+    });
+
+    elements.saveButton.click();
+    await vi.waitFor(() =>
+      expect(elements.saveStatus.textContent).toBe(
+        '当前页面没有可保存的岗位数据。',
+      ),
+    );
+    expect(saveObservations).not.toHaveBeenCalled();
+  });
+
+  it('shows a stable generic bridge failure and restores the save button', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const saveObservations = vi
+      .fn()
+      .mockRejectedValue(new Error('PRIVATE_NETWORK_DETAIL'));
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: savableExtractionResult.pageUrl,
+      }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi
+        .fn()
+        .mockResolvedValue(savableExtractionResult),
+      saveObservations,
+    });
+
+    elements.saveButton.click();
+    await vi.waitFor(() =>
+      expect(elements.saveStatus.textContent).toBe(
+        '本地服务未启动或无法连接。',
+      ),
+    );
+    expect(elements.saveButton.disabled).toBe(false);
+  });
+
+  it('prevents concurrent saves and reports a bounded card-limit save', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    let resolveSave!: (value: { ok: true; count: number }) => void;
+    const limitedResult = {
+      ...savableExtractionResult,
+      matchedCardCount: 101,
+      cards: Array.from({ length: 100 }, (_, index) => ({
+        ...savableExtractionResult.cards[0]!,
+        title: `岗位 ${index}`,
+      })),
+      warnings: ['card_limit_reached'] as const,
+    };
+    const getActiveTab = vi.fn().mockResolvedValue({
+      id: 7,
+      url: limitedResult.pageUrl,
+    });
+    const executeStructuredExtraction = vi.fn().mockResolvedValue(limitedResult);
+    const saveObservations = vi.fn<
+      (
+        observations: readonly JobObservationInput[],
+      ) => Promise<{ ok: true; count: number }>
+    >(
+      () =>
+        new Promise<{ ok: true; count: number }>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab,
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction,
+      saveObservations,
+    });
+
+    elements.saveButton.click();
+    elements.saveButton.click();
+    await vi.waitFor(() => expect(saveObservations).toHaveBeenCalledTimes(1));
+    expect(getActiveTab).toHaveBeenCalledTimes(2);
+    expect(executeStructuredExtraction).toHaveBeenCalledTimes(1);
+    expect(saveObservations.mock.calls[0]?.[0]).toHaveLength(100);
+    expect(elements.saveButton.disabled).toBe(true);
+
+    resolveSave({ ok: true, count: 100 });
+    await vi.waitFor(() => expect(elements.saveButton.disabled).toBe(false));
+    expect(elements.saveStatus.textContent).toBe(
+      '已保存 100 条岗位记录；当前页面匹配数量超过解析上限，仅保存已解析部分。',
     );
   });
 });

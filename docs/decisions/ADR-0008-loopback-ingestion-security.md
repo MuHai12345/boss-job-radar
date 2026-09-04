@@ -1,6 +1,6 @@
 # ADR-0008：Loopback observation ingestion 安全协议
 
-- 状态：Phase 4 / Batch 2 实现完成，等待外部审阅
+- 状态：Phase 4 / Batch 2 已通过外部验收
 - 日期：2026-09-03
 
 ## 背景

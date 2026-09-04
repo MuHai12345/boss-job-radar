@@ -1,4 +1,7 @@
 import { classifyPageUrl, type PageKind } from '../../src/page-context';
+import { mapStructuredExtractionToObservations } from '../../src/bridge/structured-extraction-to-observations';
+import type { LocalServiceSaveResult } from '../../src/bridge/local-service-client';
+import type { JobObservationInput } from '../../src/shared/job-observation-types';
 import type { ManualDomProbeResult } from '../../src/manual-validation/dom-probe-types';
 import {
   requestManualDomProbe,
@@ -36,6 +39,9 @@ export interface PopupElements {
   structuredStatus: HTMLElement;
   structuredResult: HTMLElement;
   structuredOutput: HTMLElement;
+  saveAction: HTMLElement;
+  saveButton: HTMLButtonElement;
+  saveStatus: HTMLElement;
 }
 
 export interface PopupDependencies {
@@ -44,6 +50,9 @@ export interface PopupDependencies {
   executeProbe: ExecuteManualProbe;
   executeTargetedProbe: ExecuteTargetedProbe;
   executeStructuredExtraction: ExecuteStructuredPageExtraction;
+  saveObservations: (
+    observations: readonly JobObservationInput[],
+  ) => Promise<LocalServiceSaveResult>;
 }
 
 const pageStatusLabels: Record<PageKind, string> = {
@@ -90,6 +99,15 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
   const structuredOutput = root.querySelector<HTMLElement>(
     '[data-structured-extraction-output]',
   );
+  const saveAction = root.querySelector<HTMLElement>(
+    '[data-local-save-action]',
+  );
+  const saveButton = root.querySelector<HTMLButtonElement>(
+    '[data-local-save-button]',
+  );
+  const saveStatus = root.querySelector<HTMLElement>(
+    '[data-local-save-status]',
+  );
 
   return pageStatus &&
     version &&
@@ -107,7 +125,10 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
     structuredButton &&
     structuredStatus &&
     structuredResult &&
-    structuredOutput
+    structuredOutput &&
+    saveAction &&
+    saveButton &&
+    saveStatus
     ? {
         pageStatus,
         version,
@@ -126,6 +147,9 @@ export function findPopupElements(root: ParentNode): PopupElements | null {
         structuredStatus,
         structuredResult,
         structuredOutput,
+        saveAction,
+        saveButton,
+        saveStatus,
       }
     : null;
 }
@@ -152,6 +176,9 @@ export async function initializePopup(
     structuredStatus,
     structuredResult,
     structuredOutput,
+    saveAction,
+    saveButton,
+    saveStatus,
   } = elements;
   version.textContent = dependencies.version;
   action.hidden = true;
@@ -166,9 +193,13 @@ export async function initializePopup(
   targetedOutput.textContent = '';
   structuredResult.hidden = true;
   structuredOutput.textContent = '';
+  saveAction.hidden = true;
+  saveButton.disabled = true;
+  saveStatus.textContent = '';
   let manualProbeInFlight = false;
   let targetedProbeInFlight = false;
   let structuredExtractionInFlight = false;
+  let localSaveInFlight = false;
 
   function applyPageState(tab: ManualProbeTab): void {
     const classification = classifyPageUrl(tab.url);
@@ -186,6 +217,9 @@ export async function initializePopup(
     structuredAction.hidden = !structuredClassification.supported;
     structuredButton.disabled =
       !structuredClassification.supported || structuredExtractionInFlight;
+    saveAction.hidden = !structuredClassification.supported;
+    saveButton.disabled =
+      !structuredClassification.supported || localSaveInFlight;
   }
 
   button.addEventListener('click', () => {
@@ -325,6 +359,67 @@ export async function initializePopup(
         structuredExtractionInFlight = false;
         if (currentTab === undefined) {
           structuredButton.disabled = false;
+        } else {
+          applyPageState(currentTab);
+        }
+      }
+    })();
+  });
+
+  saveButton.addEventListener('click', () => {
+    if (localSaveInFlight) {
+      return;
+    }
+    localSaveInFlight = true;
+    saveButton.disabled = true;
+    saveStatus.textContent = '正在重新解析并保存当前岗位数据…';
+
+    void (async () => {
+      let currentTab: ManualProbeTab | undefined;
+      try {
+        currentTab = (await dependencies.getActiveTab()) ?? {};
+        applyPageState(currentTab);
+        const outcome = await requestStructuredPageExtraction(
+          currentTab,
+          dependencies.executeStructuredExtraction,
+        );
+        if (!outcome.ok) {
+          saveStatus.textContent = outcome.message;
+          return;
+        }
+
+        const observations = mapStructuredExtractionToObservations(
+          outcome.result,
+        );
+        if (observations.length === 0) {
+          saveStatus.textContent = '当前页面没有可保存的岗位数据。';
+          return;
+        }
+
+        let saveResult: LocalServiceSaveResult;
+        try {
+          saveResult = await dependencies.saveObservations(observations);
+        } catch {
+          saveStatus.textContent = '本地服务未启动或无法连接。';
+          return;
+        }
+        if (!saveResult.ok) {
+          saveStatus.textContent = saveResult.message;
+          return;
+        }
+
+        saveStatus.textContent = outcome.result.warnings.includes(
+          'card_limit_reached',
+        )
+          ? `已保存 ${saveResult.count} 条岗位记录；当前页面匹配数量超过解析上限，仅保存已解析部分。`
+          : `已保存 ${saveResult.count} 条岗位记录到本地。`;
+      } catch {
+        saveStatus.textContent =
+          '无法重新确认当前页面，请关闭扩展弹窗后重试。';
+      } finally {
+        localSaveInFlight = false;
+        if (currentTab === undefined) {
+          saveButton.disabled = false;
         } else {
           applyPageState(currentTab);
         }

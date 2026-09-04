@@ -11,12 +11,12 @@ const buildTargets = [
   { name: 'Edge', directory: 'edge-mv3' },
 ];
 const expectedPermissions = ['activeTab', 'scripting'];
+const expectedHostPermissions = ['http://127.0.0.1:32123/*'];
 const forbiddenPermissions = ['tabs', 'storage', 'cookies'];
 
 const forbiddenManifestKeys = [
   'background',
   'content_scripts',
-  'host_permissions',
   'optional_host_permissions',
   'optional_permissions',
 ];
@@ -56,6 +56,12 @@ for (const target of buildTargets) {
     );
   }
 
+  assert.deepEqual(
+    manifest.host_permissions,
+    expectedHostPermissions,
+    `${target.name}: host permissions must contain only the fixed loopback service`,
+  );
+
   for (const key of forbiddenManifestKeys) {
     assert.equal(
       Object.hasOwn(manifest, key),
@@ -69,8 +75,18 @@ for (const target of buildTargets) {
     false,
     `${target.name}: <all_urls> is forbidden`,
   );
+  assert.equal(
+    manifestText.includes('http://localhost/'),
+    false,
+    `${target.name}: localhost hostname permission is forbidden`,
+  );
+  assert.equal(
+    manifestText.includes('http://127.0.0.1/*'),
+    false,
+    `${target.name}: unscoped loopback port permission is forbidden`,
+  );
 
   console.log(
-    `${target.name}: PASS (MV3, popup, version ${manifest.version}, activeTab + scripting only)`,
+    `${target.name}: PASS (MV3, popup, version ${manifest.version}, activeTab + scripting, fixed loopback host permission)`,
   );
 }

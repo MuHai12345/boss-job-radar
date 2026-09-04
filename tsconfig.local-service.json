@@ -4,11 +4,14 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noUncheckedIndexedAccess": true,
-    "outDir": ".output/local-service",
-    "rootDir": "src/local-service",
+    "outDir": ".output",
+    "rootDir": "src",
     "strict": true,
     "target": "ES2022",
     "types": ["node"]
   },
-  "include": ["src/local-service/**/*.ts"]
+  "include": [
+    "src/local-service/**/*.ts",
+    "src/shared/job-observation-types.ts"
+  ]
 }

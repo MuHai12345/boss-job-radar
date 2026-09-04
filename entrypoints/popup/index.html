@@ -69,6 +69,21 @@
         ></p>
       </section>
 
+      <section class="probe-action" data-local-save-action hidden>
+        <h2>保存到本地</h2>
+        <p class="privacy-note">
+          点击后重新读取当前页面，仅将结构化岗位记录发送到固定的本机服务并写入 SQLite。
+        </p>
+        <button type="button" data-local-save-button disabled>
+          保存当前岗位数据到本地
+        </button>
+        <p
+          class="probe-status"
+          data-local-save-status
+          aria-live="polite"
+        ></p>
+      </section>
+
       <section class="probe-result" data-probe-result hidden>
         <h2>结构诊断结果</h2>
         <p class="share-warning">

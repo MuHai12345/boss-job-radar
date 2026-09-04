@@ -6,15 +6,17 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 3 与 Phase 4 / Batch 1 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 2 为 `implementation_complete_awaiting_external_review`。**
+**Phase 3、Phase 4 / Batch 1 与 Phase 4 / Batch 2 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 3 为 `implementation_complete_awaiting_external_review`。**
 
-当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle，以及仅限 local service 的受保护 observation ingestion HTTP protocol。仍未实现 extension → localhost bridge、host permission、extraction → observation DTO mapping、dedupe、AI 和 Dashboard。
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol，以及由用户明确点击触发的 extension → localhost save bridge。仍未实现 Job identity、dedupe、SearchRun、AI 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
 打开 popup 时仍只识别当前页面并显示页面状态、扩展版本与功能状态，不会自动读取 DOM。通用 Probe 保留“人工验证当前页面”按钮；Targeted Probe 的“深度验证岗位结构”按钮只在 `/web/geek/jobs` 或 `/job_detail/*.html` 页面显示，并且在点击当刻重新验证活动标签页。结果分别显示在 popup，不自动保存、不自动复制、不上传，也不发起网络请求。
 
 新增 **Manual Structured Current-Page Extraction**：“解析当前岗位数据”仅在 `/web/geek/jobs` 或单层 `/job_detail/*.html` 页面可用，并且必须由用户点击。它只读取当前 DOM 中已验证的岗位字段，结果暂时只显示为 popup JSON；不保存、不上传、不自动导航、不自动浏览，也不是后台采集器。
+
+新增独立 **Manual Local Save**：“保存当前岗位数据到本地”只在相同的受支持页面可用。每次点击都会重新取得活动标签页并重新执行 structured extraction，不复用 popup 中此前显示的 JSON；随后在 extension context 将纯 mapping 生成的 `JobObservationInput[]` 发送到固定 `http://127.0.0.1:32123`。空结果不会访问 localhost。每次保存重新获取一次 ephemeral session，GET 与 POST 各自 5 秒 timeout 且不自动重试；token 不持久化、不显示，成功 UI 只显示保存条数。
 
 Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 roots，并以固定节点、深度和文本上限输出结构摘要。用户已完成搜索页和多个详情页的人工 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对；仓库现包含与 synthetic profiles 分离的 verified BOSS selector profiles，以及由脱敏 real-shape fixtures 驱动的纯 parser 测试。
 
@@ -34,6 +36,7 @@ local service 每次启动都会在进程内生成新的高熵 bridge session to
 - [数据字典](docs/DATA_DICTIONARY.md)
 - [阶段路线](docs/ROADMAP.md)
 - [项目状态](docs/PROJECT_STATE.md)
+- [产品能力矩阵](docs/PRODUCT_CAPABILITY_MATRIX.md)
 - [架构决策记录](docs/decisions/)
 - [协作规则](AGENTS.md)
 
@@ -70,12 +73,13 @@ npm run verify:manifests
 - 追求高召回，低分或信息不完整岗位只能被降级或标记，不能被静默隐藏。
 - 只读取用户当前页面已经存在且任务明确允许的 DOM，不调用 BOSS 私有 API。
 - 通用 DOM Probe、Targeted DOM Probe 和结构化当前页解析都只在用户点击对应按钮后运行一次，不自动运行、不后台运行、不保存、不上传。
+- 手动本地保存也只在用户点击独立按钮后运行；它重新解析当前页面，只向固定 localhost 发送 mapping 后的 observation DTO，不发送 whole document、HTML、DOM diagnostics、Cookie、Session、storage 或浏览历史。
 - 不获取或导出 Cookie、Session、密码或验证码。
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
 - 当前 HTTP 服务固定 loopback-only，`GET /health` contract 不变，并新增受严格 Host、Origin、token、media type、body size 和 DTO validation 保护的 observation ingestion；没有 permissive CORS。
 - 当前 SQLite 包含 production OS data path policy、显式底层打开 API、migration runner、append-only observation schema，以及有限的 `append` / transactional `appendMany` / `getById` persistence API；没有 Job identity 或 dedupe。
-- 当前没有 extension → localhost bridge、host permissions、extraction → observation DTO mapping、AI 或 Dashboard。
+- 当前 extension host permission 仅为 `http://127.0.0.1:32123/*`；没有其他 localhost 范围、`<all_urls>`、自动采集、Job identity、dedupe、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3 与 Phase 4 / Batch 1 已通过外部验收；Phase 4 / Batch 2 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。
+Phase 3、Phase 4 / Batch 1 与 Phase 4 / Batch 2 已通过外部验收；Phase 4 / Batch 3 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。
