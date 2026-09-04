@@ -500,9 +500,48 @@ describe('secured loopback observation ingestion', () => {
     expect(responseBody).toEqual({ ids: [expect.any(Number)] });
     expect(database?.observations.getById(responseBody.ids[0]!)).toEqual({
       id: responseBody.ids[0],
+      jobId: expect.any(Number),
       ...observation,
     });
     expect(response.body).not.toContain(observation.rawText);
+  });
+
+  it('keeps the response contract while repeated canonical URLs reuse one Job', async () => {
+    const { database, service } = await startTestService();
+    const { token } = await getSession(service);
+    const observation = createObservation({
+      jobUrl: 'https://example.invalid/jobs/http-repeat',
+    });
+
+    const firstResponse = await postObservations({
+      body: JSON.stringify({ observations: [observation] }),
+      service,
+      token,
+    });
+    const secondResponse = await postObservations({
+      body: JSON.stringify({
+        observations: [
+          { ...observation, capturedAt: '2026-09-03T11:00:00.000Z' },
+        ],
+      }),
+      service,
+      token,
+    });
+    const firstBody = JSON.parse(firstResponse.body) as { ids: number[] };
+    const secondBody = JSON.parse(secondResponse.body) as { ids: number[] };
+    const firstRecord = database?.observations.getById(firstBody.ids[0]!);
+    const secondRecord = database?.observations.getById(secondBody.ids[0]!);
+
+    expect(firstResponse.statusCode).toBe(201);
+    expect(secondResponse.statusCode).toBe(201);
+    expect(firstBody).toEqual({ ids: [expect.any(Number)] });
+    expect(secondBody).toEqual({ ids: [expect.any(Number)] });
+    expect(firstBody.ids[0]).not.toBe(secondBody.ids[0]);
+    expect(firstRecord?.jobId).toBe(secondRecord?.jobId);
+    expect(database?.jobs.findByJobUrl(observation.jobUrl!)).toMatchObject({
+      id: firstRecord?.jobId,
+      latestObservationId: secondBody.ids[0],
+    });
   });
 
   it('returns batch ids in input order and keeps duplicates distinct', async () => {

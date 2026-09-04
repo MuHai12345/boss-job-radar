@@ -66,7 +66,11 @@ describe('job observation repository', () => {
 
       expect(Number.isSafeInteger(id)).toBe(true);
       expect(id).toBeGreaterThan(0);
-      expect(database.observations.getById(id)).toEqual({ id, ...input });
+      expect(database.observations.getById(id)).toEqual({
+        id,
+        jobId: expect.any(Number),
+        ...input,
+      });
     } finally {
       database.close();
     }
@@ -83,10 +87,12 @@ describe('job observation repository', () => {
       expect(second.id).not.toBe(first.id);
       expect(database.observations.getById(first.id)).toEqual({
         id: first.id,
+        jobId: expect.any(Number),
         ...input,
       });
       expect(database.observations.getById(second.id)).toEqual({
         id: second.id,
+        jobId: expect.any(Number),
         ...input,
       });
     } finally {
@@ -106,10 +112,12 @@ describe('job observation repository', () => {
       expect(ids[1]).toBeGreaterThan(ids[0]!);
       expect(database.observations.getById(ids[0]!)).toEqual({
         id: ids[0],
+        jobId: expect.any(Number),
         ...first,
       });
       expect(database.observations.getById(ids[1]!)).toEqual({
         id: ids[1],
+        jobId: expect.any(Number),
         ...second,
       });
     } finally {
@@ -155,6 +163,9 @@ describe('job observation repository', () => {
         sqlite
           .prepare('SELECT COUNT(*) AS count FROM job_observations')
           .get(),
+      ).toEqual({ count: 0 });
+      expect(
+        sqlite.prepare('SELECT COUNT(*) AS count FROM jobs').get(),
       ).toEqual({ count: 0 });
     } finally {
       sqlite.close();
@@ -216,7 +227,11 @@ describe('job observation repository', () => {
       secondConnection.close();
     }
 
-    expect(recovered).toEqual({ id: firstId, ...input });
+    expect(recovered).toEqual({
+      id: firstId,
+      jobId: expect.any(Number),
+      ...input,
+    });
     expect(secondId).not.toBe(firstId);
 
     const inspectionConnection = new SqliteDatabase(databasePath, {
@@ -227,7 +242,10 @@ describe('job observation repository', () => {
         inspectionConnection
           .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
           .all(),
-      ).toEqual([{ name: 'create_job_observations', version: 1 }]);
+      ).toEqual([
+        { name: 'create_job_observations', version: 1 },
+        { name: 'create_job_identity', version: 2 },
+      ]);
       expect(
         inspectionConnection
           .prepare('SELECT COUNT(*) AS count FROM job_observations')
@@ -246,6 +264,7 @@ describe('job observation repository', () => {
       const first = database.observations.append(input);
       expect(database.observations.getById(first.id)).toEqual({
         id: first.id,
+        jobId: expect.any(Number),
         ...input,
       });
 
@@ -257,6 +276,45 @@ describe('job observation repository', () => {
       );
     } finally {
       database.close();
+    }
+  });
+
+  it('rolls back observations and jobs when Job lifecycle update fails', () => {
+    const sqlite = new SqliteDatabase(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+    runMigrations(sqlite);
+    sqlite.exec(`
+      CREATE TRIGGER fail_synthetic_job_update
+      BEFORE UPDATE ON jobs
+      WHEN NEW.last_seen_at = '2026-09-04T12:00:00.000Z'
+      BEGIN
+        SELECT RAISE(ABORT, 'synthetic Job update failure');
+      END;
+    `);
+    const repository = createJobObservationRepository(sqlite);
+
+    try {
+      expect(() =>
+        repository.appendMany([
+          createObservation({
+            jobUrl: 'https://example.invalid/jobs/update-will-rollback',
+            title: 'would otherwise persist',
+          }),
+          createObservation({
+            capturedAt: '2026-09-04T12:00:00.000Z',
+            jobUrl: 'https://example.invalid/jobs/update-will-rollback',
+            title: 'force synthetic Job update failure',
+          }),
+        ]),
+      ).toThrow('synthetic Job update failure');
+      expect(
+        sqlite.prepare('SELECT COUNT(*) AS count FROM job_observations').get(),
+      ).toEqual({ count: 0 });
+      expect(
+        sqlite.prepare('SELECT COUNT(*) AS count FROM jobs').get(),
+      ).toEqual({ count: 0 });
+    } finally {
+      sqlite.close();
     }
   });
 

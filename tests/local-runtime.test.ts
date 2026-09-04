@@ -65,7 +65,7 @@ function sendHealthRequest(port: number): Promise<{
 }
 
 describe('local runtime lifecycle', () => {
-  it('creates a SQLite database with schema migration version 1', async () => {
+  it('creates a SQLite database with schema migration version 2', async () => {
     const databasePath = await createTemporaryDatabasePath();
     const runtime = await startLocalRuntime({ databasePath, port: 0 });
 
@@ -74,12 +74,12 @@ describe('local runtime lifecycle', () => {
         readonly: true,
       });
       try {
-        expect(CURRENT_SCHEMA_VERSION).toBe(1);
+        expect(CURRENT_SCHEMA_VERSION).toBe(2);
         expect(
           inspectionConnection
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all(),
-        ).toEqual([{ version: 1 }]);
+        ).toEqual([{ version: 1 }, { version: 2 }]);
       } finally {
         inspectionConnection.close();
       }

@@ -63,8 +63,16 @@ describe('local SQLite database', () => {
 
       expect(migration).toEqual([
         { name: 'create_job_observations', version: 1 },
+        { name: 'create_job_identity', version: 2 },
       ]);
       expect(observationTable).toEqual({ name: 'job_observations' });
+      expect(
+        inspectionConnection
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          )
+          .get('jobs'),
+      ).toEqual({ name: 'jobs' });
     } finally {
       inspectionConnection.close();
     }

@@ -6,6 +6,10 @@ import {
   runMigrations,
   type Migration,
 } from '../src/local-service/database/migrations';
+import {
+  createJobObservationRepository,
+  type JobObservationInput,
+} from '../src/local-service/database/observation-repository';
 
 interface TableColumn {
   readonly cid: number;
@@ -22,14 +26,40 @@ function openMigratedDatabase(): InstanceType<typeof SqliteDatabase> {
   return database;
 }
 
+function createObservation(
+  overrides: Partial<JobObservationInput> = {},
+): JobObservationInput {
+  return {
+    capturedAt: '2026-09-03T00:00:00.000Z',
+    companyName: null,
+    educationText: null,
+    experienceText: null,
+    fullJdText: null,
+    jobHrefRaw: null,
+    jobUrl: 'https://www.zhipin.com/job_detail/example.html',
+    locationText: null,
+    missingFields: [],
+    pageType: 'search_results',
+    publishedText: null,
+    rawText: '',
+    recruiterActivityText: null,
+    salaryText: null,
+    sourcePageUrl: 'https://www.zhipin.com/web/geek/jobs',
+    tags: [],
+    title: null,
+    warnings: [],
+    ...overrides,
+  };
+}
+
 describe('SQLite migrations', () => {
-  it('applies schema version 1 to a fresh database and records it', () => {
+  it('applies schema version 2 to a fresh database and records it', () => {
     const database = new SqliteDatabase(':memory:');
 
     try {
       runMigrations(database);
 
-      expect(CURRENT_SCHEMA_VERSION).toBe(1);
+      expect(CURRENT_SCHEMA_VERSION).toBe(2);
       expect(
         database
           .prepare(
@@ -43,6 +73,13 @@ describe('SQLite migrations', () => {
           ),
           name: 'create_job_observations',
           version: 1,
+        },
+        {
+          applied_at: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+          ),
+          name: 'create_job_identity',
+          version: 2,
         },
       ]);
     } finally {
@@ -93,12 +130,12 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (2, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (3, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
 
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 2 is newer than supported version 1',
+        'Database schema version 3 is newer than supported version 2',
       );
       expect(
         database
@@ -143,7 +180,7 @@ describe('SQLite migrations', () => {
   });
 });
 
-describe('job_observations schema version 1', () => {
+describe('job identity schema version 2', () => {
   it('creates exactly the approved columns, types, nullability, and defaults', () => {
     const database = openMigratedDatabase();
 
@@ -180,7 +217,162 @@ describe('job_observations schema version 1', () => {
         { dflt_value: "''", name: 'raw_text', notnull: 1, pk: 0, type: 'TEXT' },
         { dflt_value: "'[]'", name: 'missing_fields_json', notnull: 1, pk: 0, type: 'TEXT' },
         { dflt_value: "'[]'", name: 'warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
+        { dflt_value: null, name: 'job_id', notnull: 1, pk: 0, type: 'INTEGER' },
       ]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('creates constrained jobs and an indexed observation link', () => {
+    const database = openMigratedDatabase();
+
+    try {
+      const jobColumns = database
+        .prepare("PRAGMA table_info('jobs')")
+        .all() as TableColumn[];
+
+      expect(jobColumns.map(({ name, notnull, pk, type }) => ({
+        name,
+        notnull,
+        pk,
+        type,
+      }))).toEqual([
+        { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
+        { name: 'job_url', notnull: 0, pk: 0, type: 'TEXT' },
+        { name: 'unresolved_observation_id', notnull: 0, pk: 0, type: 'INTEGER' },
+        { name: 'first_seen_at', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'last_seen_at', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'latest_observation_id', notnull: 1, pk: 0, type: 'INTEGER' },
+      ]);
+      expect(
+        database
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_job_observations_job_id'")
+          .get(),
+      ).toEqual({ name: 'idx_job_observations_job_id' });
+      expect(() =>
+        database.prepare(`
+          INSERT INTO jobs (
+            job_url,
+            unresolved_observation_id,
+            first_seen_at,
+            last_seen_at,
+            latest_observation_id
+          ) VALUES (NULL, NULL, ?, ?, ?)
+        `).run(
+          '2026-09-03T00:00:00.000Z',
+          '2026-09-03T00:00:00.000Z',
+          1,
+        ),
+      ).toThrow();
+    } finally {
+      database.close();
+    }
+  });
+
+  it('backfills duplicate canonical URLs and keeps null URLs unresolved and separate', () => {
+    const database = new SqliteDatabase(':memory:');
+    database.pragma('foreign_keys = ON');
+    database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations (version, name, applied_at)
+      VALUES (1, 'create_job_observations', '2026-09-03T00:00:00.000Z');
+      CREATE TABLE job_observations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        captured_at TEXT NOT NULL,
+        page_type TEXT NOT NULL CHECK (page_type IN ('search_results', 'job_detail')),
+        source_page_url TEXT NOT NULL,
+        job_href_raw TEXT NULL,
+        job_url TEXT NULL,
+        title TEXT NULL,
+        company_name TEXT NULL,
+        salary_text TEXT NULL,
+        location_text TEXT NULL,
+        experience_text TEXT NULL,
+        education_text TEXT NULL,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        recruiter_activity_text TEXT NULL,
+        published_text TEXT NULL,
+        full_jd_text TEXT NULL,
+        raw_text TEXT NOT NULL DEFAULT '',
+        missing_fields_json TEXT NOT NULL DEFAULT '[]',
+        warnings_json TEXT NOT NULL DEFAULT '[]'
+      );
+    `);
+    const insert = database.prepare(`
+      INSERT INTO job_observations (
+        captured_at,
+        page_type,
+        source_page_url,
+        job_url,
+        title
+      ) VALUES (?, 'search_results', 'https://example.invalid/source', ?, ?)
+    `);
+    const urlA = 'https://example.invalid/jobs/A';
+    const urlB = 'https://example.invalid/jobs/B';
+
+    try {
+      const observationIds = [
+        Number(insert.run('2026-09-03T10:00:00.000Z', urlA, 'A old').lastInsertRowid),
+        Number(insert.run('2026-09-03T11:00:00.000Z', urlA, 'A newer first').lastInsertRowid),
+        Number(insert.run('2026-09-03T11:00:00.000Z', urlA, 'A newer tie').lastInsertRowid),
+        Number(insert.run('2026-09-03T09:00:00.000Z', urlB, 'B').lastInsertRowid),
+        Number(insert.run('2026-09-03T12:00:00.000Z', null, 'unresolved one').lastInsertRowid),
+        Number(insert.run('2026-09-03T12:00:00.000Z', null, 'unresolved two').lastInsertRowid),
+      ];
+
+      runMigrations(database);
+      runMigrations(database);
+
+      const jobs = database.prepare(`
+        SELECT
+          id,
+          job_url,
+          unresolved_observation_id,
+          first_seen_at,
+          last_seen_at,
+          latest_observation_id
+        FROM jobs
+        ORDER BY id
+      `).all() as Array<Record<string, unknown>>;
+      const canonicalA = jobs.find((job) => job.job_url === urlA);
+      const canonicalB = jobs.find((job) => job.job_url === urlB);
+      const unresolved = jobs.filter((job) => job.job_url === null);
+
+      expect(jobs).toHaveLength(4);
+      expect(canonicalA).toMatchObject({
+        first_seen_at: '2026-09-03T10:00:00.000Z',
+        last_seen_at: '2026-09-03T11:00:00.000Z',
+        latest_observation_id: observationIds[2],
+        unresolved_observation_id: null,
+      });
+      expect(canonicalB).toMatchObject({
+        first_seen_at: '2026-09-03T09:00:00.000Z',
+        last_seen_at: '2026-09-03T09:00:00.000Z',
+        latest_observation_id: observationIds[3],
+      });
+      expect(unresolved.map((job) => job.unresolved_observation_id)).toEqual([
+        observationIds[4],
+        observationIds[5],
+      ]);
+      expect(
+        database.prepare('SELECT id, job_id FROM job_observations ORDER BY id').all(),
+      ).toEqual([
+        { id: observationIds[0], job_id: canonicalA?.id },
+        { id: observationIds[1], job_id: canonicalA?.id },
+        { id: observationIds[2], job_id: canonicalA?.id },
+        { id: observationIds[3], job_id: canonicalB?.id },
+        { id: observationIds[4], job_id: unresolved[0]?.id },
+        { id: observationIds[5], job_id: unresolved[1]?.id },
+      ]);
+      expect(
+        database.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE version = 2').get(),
+      ).toEqual({ count: 1 });
+      expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
     } finally {
       database.close();
     }
@@ -188,19 +380,16 @@ describe('job_observations schema version 1', () => {
 
   it('rejects unsupported page types at the database boundary', () => {
     const database = openMigratedDatabase();
+    const repository = createJobObservationRepository(database);
 
     try {
       expect(() =>
-        database
-          .prepare(
-            'INSERT INTO job_observations (captured_at, page_type, source_page_url) VALUES (?, ?, ?)',
-          )
-          .run(
-            '2026-09-03T00:00:00.000Z',
-            'unsupported',
-            'https://example.invalid/source',
-          ),
-      ).toThrow();
+        repository.append(
+          createObservation({
+            pageType: 'unsupported' as JobObservationInput['pageType'],
+          }),
+        ),
+      ).toThrow(/CHECK constraint failed/u);
     } finally {
       database.close();
     }
@@ -208,29 +397,17 @@ describe('job_observations schema version 1', () => {
 
   it('allows duplicate job URLs and nullable platform fields', () => {
     const database = openMigratedDatabase();
-    const insert = database.prepare(`
-      INSERT INTO job_observations (
-        captured_at,
-        page_type,
-        source_page_url,
-        job_url
-      ) VALUES (?, ?, ?, ?)
-    `);
+    const repository = createJobObservationRepository(database);
     const jobUrl = 'https://www.zhipin.com/job_detail/example.html';
 
     try {
-      insert.run(
-        '2026-09-03T00:00:00.000Z',
-        'search_results',
-        'https://www.zhipin.com/web/geek/jobs',
+      repository.append(createObservation({ jobUrl }));
+      repository.append(createObservation({
+        capturedAt: '2026-09-03T00:01:00.000Z',
         jobUrl,
-      );
-      insert.run(
-        '2026-09-03T00:01:00.000Z',
-        'job_detail',
-        jobUrl,
-        jobUrl,
-      );
+        pageType: 'job_detail',
+        sourcePageUrl: jobUrl,
+      }));
 
       const observations = database
         .prepare(
@@ -275,15 +452,34 @@ describe('job_observations schema version 1', () => {
     const database = openMigratedDatabase();
 
     try {
-      database
-        .prepare(
-          'INSERT INTO job_observations (captured_at, page_type, source_page_url) VALUES (?, ?, ?)',
-        )
-        .run(
+      database.transaction(() => {
+        const job = database.prepare(`
+          INSERT INTO jobs (
+            job_url,
+            unresolved_observation_id,
+            first_seen_at,
+            last_seen_at,
+            latest_observation_id
+          ) VALUES (?, NULL, ?, ?, 1)
+        `).run(
+          'https://example.invalid/jobs/defaults',
           '2026-09-03T00:00:00.000Z',
-          'search_results',
-          'https://www.zhipin.com/web/geek/jobs',
+          '2026-09-03T00:00:00.000Z',
         );
+        database.prepare(`
+          INSERT INTO job_observations (
+            id,
+            captured_at,
+            page_type,
+            source_page_url,
+            job_id
+          ) VALUES (1, ?, 'search_results', ?, ?)
+        `).run(
+          '2026-09-03T00:00:00.000Z',
+          'https://www.zhipin.com/web/geek/jobs',
+          job.lastInsertRowid,
+        );
+      })();
 
       expect(
         database

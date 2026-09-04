@@ -5,8 +5,13 @@ import {
   createJobObservationRepository,
   type JobObservationRepository,
 } from './observation-repository.js';
+import {
+  createJobRepository,
+  type JobRepository,
+} from './job-repository.js';
 
 export interface LocalDatabase {
+  readonly jobs: JobRepository;
   readonly observations: JobObservationRepository;
   isForeignKeyEnforcementEnabled(): boolean;
   close(): void;
@@ -16,11 +21,13 @@ export function openLocalDatabase(options: {
   readonly path: string;
 }): LocalDatabase {
   const database = new SqliteDatabase(options.path);
+  let jobs: JobRepository;
   let observations: JobObservationRepository;
 
   try {
     database.pragma('foreign_keys = ON');
     runMigrations(database);
+    jobs = createJobRepository(database);
     observations = createJobObservationRepository(database);
   } catch (error) {
     database.close();
@@ -29,6 +36,7 @@ export function openLocalDatabase(options: {
 
   let closed = false;
   return {
+    jobs,
     observations,
     isForeignKeyEnforcementEnabled(): boolean {
       return database.pragma('foreign_keys', { simple: true }) === 1;

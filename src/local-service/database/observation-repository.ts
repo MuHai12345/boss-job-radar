@@ -5,6 +5,7 @@ export type { JobObservationInput } from '../../shared/job-observation-types.js'
 
 export interface JobObservationRecord extends JobObservationInput {
   readonly id: number;
+  readonly jobId: number;
 }
 
 export interface JobObservationRepository {
@@ -20,6 +21,7 @@ interface JobObservationRow {
   readonly source_page_url: string;
   readonly job_href_raw: string | null;
   readonly job_url: string | null;
+  readonly job_id: number | null;
   readonly title: string | null;
   readonly company_name: string | null;
   readonly salary_text: string | null;
@@ -85,6 +87,22 @@ function toObservationId(value: number | bigint): number {
   return value;
 }
 
+function toJobId(value: number | bigint): number {
+  if (typeof value === 'bigint') {
+    if (value <= 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error('Generated job id is not a positive safe integer');
+    }
+
+    return Number(value);
+  }
+
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error('Generated job id is not a positive safe integer');
+  }
+
+  return value;
+}
+
 function validateRequestedId(id: number): void {
   if (!Number.isSafeInteger(id) || id <= 0) {
     throw new Error('Observation id must be a positive safe integer');
@@ -96,28 +114,6 @@ export function createJobObservationRepository(
 ): JobObservationRepository {
   const insertObservation = database.prepare(`
     INSERT INTO job_observations (
-      captured_at,
-      page_type,
-      source_page_url,
-      job_href_raw,
-      job_url,
-      title,
-      company_name,
-      salary_text,
-      location_text,
-      experience_text,
-      education_text,
-      tags_json,
-      recruiter_activity_text,
-      published_text,
-      full_jd_text,
-      raw_text,
-      missing_fields_json,
-      warnings_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const selectObservationById = database.prepare(`
-    SELECT
       id,
       captured_at,
       page_type,
@@ -136,13 +132,134 @@ export function createJobObservationRepository(
       full_jd_text,
       raw_text,
       missing_fields_json,
+      warnings_json,
+      job_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const selectObservationById = database.prepare(`
+    SELECT
+      id,
+      captured_at,
+      page_type,
+      source_page_url,
+      job_href_raw,
+      job_url,
+      job_id,
+      title,
+      company_name,
+      salary_text,
+      location_text,
+      experience_text,
+      education_text,
+      tags_json,
+      recruiter_activity_text,
+      published_text,
+      full_jd_text,
+      raw_text,
+      missing_fields_json,
       warnings_json
     FROM job_observations
     WHERE id = ?
   `);
+  const selectNextObservationId = database.prepare(`
+    SELECT COALESCE(
+      (
+        SELECT seq
+        FROM sqlite_sequence
+        WHERE name = 'job_observations'
+      ),
+      0
+    ) + 1 AS id
+  `);
+  const insertCanonicalJob = database.prepare(`
+    INSERT INTO jobs (
+      job_url,
+      unresolved_observation_id,
+      first_seen_at,
+      last_seen_at,
+      latest_observation_id
+    ) VALUES (?, NULL, ?, ?, ?)
+  `);
+  const updateCanonicalJobLifecycle = database.prepare(`
+    UPDATE jobs
+    SET
+      first_seen_at = CASE
+        WHEN ? < first_seen_at
+          THEN ?
+        ELSE jobs.first_seen_at
+      END,
+      last_seen_at = CASE
+        WHEN ? > last_seen_at
+          THEN ?
+        ELSE jobs.last_seen_at
+      END,
+      latest_observation_id = CASE
+        WHEN ? > last_seen_at
+          OR (
+            ? = last_seen_at
+            AND ? > latest_observation_id
+          )
+          THEN ?
+        ELSE jobs.latest_observation_id
+      END
+    WHERE id = ?
+  `);
+  const selectCanonicalJobId = database.prepare(`
+    SELECT id
+    FROM jobs
+    WHERE job_url = ?
+  `);
+  const insertUnresolvedJob = database.prepare(`
+    INSERT INTO jobs (
+      job_url,
+      unresolved_observation_id,
+      first_seen_at,
+      last_seen_at,
+      latest_observation_id
+    ) VALUES (NULL, ?, ?, ?, ?)
+  `);
+  const linkObservation = database.prepare(`
+    SELECT id
+    FROM jobs
+    WHERE id = ?
+  `);
 
   const appendOne = (input: JobObservationInput): number => {
-    const result = insertObservation.run(
+    const nextObservation = selectNextObservationId.get() as {
+      readonly id: number;
+    };
+    const observationId = toObservationId(nextObservation.id);
+    let jobId: number;
+    let updateExistingCanonical = false;
+
+    if (input.jobUrl === null) {
+      const jobResult = insertUnresolvedJob.run(
+        observationId,
+        input.capturedAt,
+        input.capturedAt,
+        observationId,
+      );
+      jobId = toJobId(jobResult.lastInsertRowid);
+    } else {
+      const existingJob = selectCanonicalJobId.get(input.jobUrl) as
+        | { readonly id: number }
+        | undefined;
+      if (existingJob === undefined) {
+        const jobResult = insertCanonicalJob.run(
+          input.jobUrl,
+          input.capturedAt,
+          input.capturedAt,
+          observationId,
+        );
+        jobId = toJobId(jobResult.lastInsertRowid);
+      } else {
+        jobId = toJobId(existingJob.id);
+        updateExistingCanonical = true;
+      }
+    }
+
+    insertObservation.run(
+      observationId,
       input.capturedAt,
       input.pageType,
       input.sourcePageUrl,
@@ -161,10 +278,35 @@ export function createJobObservationRepository(
       input.rawText,
       JSON.stringify(input.missingFields),
       JSON.stringify(input.warnings),
+      jobId,
     );
 
-    return toObservationId(result.lastInsertRowid);
+    if (updateExistingCanonical) {
+      const updateResult = updateCanonicalJobLifecycle.run(
+        input.capturedAt,
+        input.capturedAt,
+        input.capturedAt,
+        input.capturedAt,
+        input.capturedAt,
+        input.capturedAt,
+        observationId,
+        observationId,
+        jobId,
+      );
+      if (updateResult.changes !== 1) {
+        throw new Error('Canonical Job lifecycle was not updated');
+      }
+    }
+
+    if (linkObservation.get(jobId) === undefined) {
+      throw new Error('Observation was not linked to a persisted Job');
+    }
+
+    return observationId;
   };
+  const appendSingle = database.transaction(
+    (input: JobObservationInput): number => appendOne(input),
+  );
   const appendBatch = database.transaction(
     (inputs: readonly JobObservationInput[]): number[] =>
       inputs.map((input) => appendOne(input)),
@@ -172,11 +314,11 @@ export function createJobObservationRepository(
 
   return {
     append(input): { id: number } {
-      return { id: appendOne(input) };
+      return { id: appendSingle.immediate(input) };
     },
 
     appendMany(inputs): { ids: number[] } {
-      return { ids: appendBatch(inputs) };
+      return { ids: appendBatch.immediate(inputs) };
     },
 
     getById(id): JobObservationRecord | null {
@@ -188,6 +330,9 @@ export function createJobObservationRepository(
       if (row === undefined) {
         return null;
       }
+      if (row.job_id === null) {
+        throw new Error(`Job observation ${row.id} is not linked to a Job`);
+      }
 
       return {
         capturedAt: row.captured_at,
@@ -197,6 +342,7 @@ export function createJobObservationRepository(
         fullJdText: row.full_jd_text,
         id: row.id,
         jobHrefRaw: row.job_href_raw,
+        jobId: row.job_id,
         jobUrl: row.job_url,
         locationText: row.location_text,
         missingFields: parseStringArray(
