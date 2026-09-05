@@ -65,6 +65,7 @@ describe('local SQLite database', () => {
         { name: 'create_job_observations', version: 1 },
         { name: 'create_job_identity', version: 2 },
         { name: 'create_import_provenance', version: 3 },
+        { name: 'create_deterministic_job_analyses', version: 4 },
       ]);
       expect(observationTable).toEqual({ name: 'job_observations' });
       expect(

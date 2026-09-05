@@ -53,13 +53,13 @@ function createObservation(
 }
 
 describe('SQLite migrations', () => {
-  it('applies schema version 3 to a fresh database and records it', () => {
+  it('applies schema version 4 to a fresh database and records it', () => {
     const database = new SqliteDatabase(':memory:');
 
     try {
       runMigrations(database);
 
-      expect(CURRENT_SCHEMA_VERSION).toBe(3);
+      expect(CURRENT_SCHEMA_VERSION).toBe(4);
       expect(
         database
           .prepare(
@@ -87,6 +87,13 @@ describe('SQLite migrations', () => {
           ),
           name: 'create_import_provenance',
           version: 3,
+        },
+        {
+          applied_at: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+          ),
+          name: 'create_deterministic_job_analyses',
+          version: 4,
         },
       ]);
     } finally {
@@ -137,12 +144,12 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (4, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (5, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
 
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 4 is newer than supported version 3',
+        'Database schema version 5 is newer than supported version 4',
       );
       expect(
         database

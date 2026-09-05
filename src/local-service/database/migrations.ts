@@ -274,9 +274,44 @@ const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 4,
+    name: 'create_deterministic_job_analyses',
+    up(database) {
+      database.exec(`
+        CREATE TABLE deterministic_job_analyses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          latest_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          jd_observation_id INTEGER NULL REFERENCES job_observations(id),
+          rules_version TEXT NOT NULL CHECK (length(rules_version) > 0),
+          job_nature_status TEXT NOT NULL CHECK (job_nature_status IN (
+            'genuine_ecommerce_ops', 'mixed_ecommerce_ops',
+            'likely_non_ecommerce_ops', 'insufficient_evidence'
+          )),
+          experience_status TEXT NOT NULL CHECK (experience_status IN (
+            'no_requirement', 'preference_only', 'hard_minimum',
+            'contradictory', 'insufficient_evidence'
+          )),
+          hard_minimum_years INTEGER NULL CHECK (
+            hard_minimum_years IS NULL OR (
+              typeof(hard_minimum_years) = 'integer'
+              AND hard_minimum_years BETWEEN 1 AND 99
+            )
+          ),
+          analysis_json TEXT NOT NULL,
+          analyzed_at TEXT NOT NULL,
+          UNIQUE (job_id, latest_observation_id, rules_version)
+        );
+
+        CREATE INDEX idx_job_observations_analysis_source
+        ON job_observations(job_id, captured_at DESC, id DESC);
+      `);
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 interface MaximumVersionRow {
   readonly version: number | null;

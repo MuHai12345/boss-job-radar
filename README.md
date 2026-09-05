@@ -6,9 +6,9 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 3、Phase 4 / Batch 1、Batch 2、Batch 3 与 Batch 4 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 5 为 `implementation_complete_awaiting_external_review`。**
+**依据本轮外部 Prompt，Phase 0–4 及 Phase 4 / Batch 1–5 均已获外部 `PASS`。Phase 5 为 `IN PROGRESS / NOT YET PASSED`；Phase 5 / Batch 1 为 `implementation_complete_awaiting_external_review`。**
 
-当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，已通过外部验收的持久化 Job identity / canonical URL dedupe，以及等待外部审阅的 ImportRun、SearchRun provenance 与幂等请求重放。仍未实现 AI 和 Dashboard。
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，以及已通过外部验收的 Job identity、ImportRun、SearchRun provenance 和幂等请求重放。本批新增确定性岗位性质与经验要求分析，等待外部审阅；未接入 LLM 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -28,9 +28,14 @@ Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 root
 
 local service 每次启动都会在进程内生成新的高熵 bridge session token。`GET /bridge/session` 只在严格匹配当前 `127.0.0.1:<actual-port>` Host 时返回 protocol version 和当前 token，并设置 `Cache-Control: no-store`。`POST /observations` 还要求 extension-only Origin（当 Origin 存在时）、custom token header、`application/json`、identity encoding、1 MiB 实收 body 上限和严格 protocol 2 envelope DTO 与 source/observation 一致性校验；每批最多 100 条，并通过有限 ImportRepository 在单一 SQLite transaction 中完成 provenance、observation append 和 Job lifecycle。服务不提供 permissive CORS，错误响应不回显 token、请求 payload、SQL 或数据库路径。
 
-当前 schema version 3 在既有 Job linking 基础上新增 `import_runs`、`search_runs` 与 nullable `job_observations.import_run_id`。历史 observation 保持 unknown provenance（NULL），不猜测历史 runs。每次新的保存动作创建 ImportRun，搜索页同时创建一个 SearchRun；详情页 matched count 为 NULL，不创建 SearchRun。source 直接来自 structured extraction，保留页面、capturedAt、matchedCardCount 和 warning 原值、原顺序；例如 143 张 matched / 100 条 saved 分别保留。通过 SearchRun → ImportRun → observations → job_id 可追溯本次观察到的 Jobs。
+schema version 3 在既有 Job linking 基础上新增 `import_runs`、`search_runs` 与 nullable `job_observations.import_run_id`。历史 observation 保持 unknown provenance（NULL），不猜测历史 runs。每次新的保存动作创建 ImportRun，搜索页同时创建一个 SearchRun；详情页 matched count 为 NULL，不创建 SearchRun。source 直接来自 structured extraction，保留页面、capturedAt、matchedCardCount 和 warning 原值、原顺序；例如 143 张 matched / 100 条 saved 分别保留。通过 SearchRun → ImportRun → observations → job_id 可追溯本次观察到的 Jobs。
 
 相同 `clientImportId` 与相同 payload 使用固定字段 serialization 的 SHA-256 识别重放，并返回第一次成功产生的 observation IDs（数据库重开后仍有效）；相同 ID 与不同 payload 返回 `409 { "error": "import_conflict" }`，不写入。不同用户点击生成新 UUID，即使页面不变仍新增 observations，canonical Job 继续复用。ImportRun、SearchRun、observations 和 Job lifecycle 任一步失败全部 rollback。local service 与 extension 需同时升级至 protocol 2，不兼容 protocol 1；`GET /health` 不变。
+
+schema version 4 新增独立 `deterministic_job_analyses`。规则版本为 `deterministic-job-analysis-v1`：保存岗位性质、真实经验硬门槛/软偏好/无要求及 header/JD 矛盾，附原文短 evidence 和来源 observation IDs。最新 title/header/tags 来自 Job latest observation；完整 JD 从全部历史观察中选择最近非空一条，因此新的搜索列表不会抹掉旧详情证据。没有 JD 时两轴最终结果均保留 insufficient_evidence。
+
+每次 ImportRun 源事实 commit 后自动分析受影响 Jobs；local HTTP listener 启动后补齐已有 Jobs。分析失败不 rollback 采集，不阻止启动或保存，仅输出固定 generic diagnostic。`LocalDatabase.analyses` 提供 `analyzeJob`、`getLatestForJob`、`refreshAll`；同 latest/rules 键幂等，新键追加历史，当前分析尚未生成返回 null，stored JSON 读取需 runtime validate。当前没有分析 HTTP endpoint 或审核 UI。阈值和边界见 [ADR-0012](docs/decisions/ADR-0012-deterministic-job-analysis-v1.md)。
+
 ## 文档入口
 
 - [产品宪章](docs/PRODUCT_CHARTER.md)
@@ -81,8 +86,8 @@ npm run verify:manifests
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
 - 当前 HTTP 服务固定 loopback-only，`GET /health` contract 不变，并新增受严格 Host、Origin、token、media type、body size 和 DTO validation 保护的 observation ingestion；没有 permissive CORS。
-- 当前 SQLite schema version 3 包含 production OS data path policy、ordered transactional migration、append-only observations、Job identity/lifecycle、canonical URL exact-match dedupe、unresolved policy、ImportRun / SearchRun provenance、幂等导入和有限 repositories；没有 observation dedupe、final aggregate facts、AI 或 Dashboard。
+- 当前 SQLite schema version 4 包含 production OS data path policy、ordered transactional migration、append-only observations、Job identity/lifecycle、ImportRun / SearchRun provenance、幂等导入与独立确定性分析；没有 observation dedupe、final aggregate facts、总分、LLM 或 Dashboard。
 - 当前 extension host permission 仅为 `http://127.0.0.1:32123/*`；没有其他 localhost 范围、`<all_urls>`、自动采集、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3、Phase 4 / Batch 1、Batch 2、Batch 3 与 Batch 4 已通过外部验收；Phase 4 / Batch 5 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
+Phase 4 及其全部批次已通过外部验收；Phase 5 为 `IN PROGRESS / NOT YET PASSED`，Phase 5 / Batch 1 实现完成，等待外部网页版 ChatGPT 独立审阅。

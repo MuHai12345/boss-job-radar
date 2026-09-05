@@ -4,6 +4,8 @@ import type { ImportRequest } from '../../shared/import-request-types.js';
 import type { JobObservationRepository } from './observation-repository.js';
 import { fingerprintImportRequest } from './import-fingerprint.js';
 import { validateImportRequest } from '../import-request-validation.js';
+import { createDeterministicAnalysisRepository } from './deterministic-analysis-repository.js';
+import { refreshAnalysisSafely } from '../deterministic-analysis-refresh.js';
 
 export class ImportConflictError extends Error {
   constructor() {
@@ -120,9 +122,22 @@ export function createImportRepository(
 
   return {
     importBatch(request): { ids: number[] } {
-      return {
-        ids: importTransaction.immediate(request),
-      };
+      const ids = importTransaction.immediate(request);
+      // The source transaction has committed. No analysis error can undo it.
+      refreshAnalysisSafely(() => {
+        const analyses = createDeterministicAnalysisRepository(database);
+        const jobIds = new Set<number>();
+        for (const id of ids) {
+          const row = database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number };
+          jobIds.add(row.job_id);
+        }
+        let failed = false;
+        for (const jobId of jobIds) {
+          try { analyses.analyzeJob(jobId); } catch { failed = true; }
+        }
+        if (failed) throw new Error('Deterministic analysis refresh failed.');
+      });
+      return { ids };
     },
   };
 }

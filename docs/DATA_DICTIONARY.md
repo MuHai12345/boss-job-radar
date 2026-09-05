@@ -82,7 +82,7 @@ schema version 3 的 `search_runs` 只在 `source.pageType === 'search_results'`
 
 ## `JobAnalysis`
 
-表示对岗位事实快照的可追溯分析，不覆盖原始数据。计划字段方向：
+表示对岗位事实快照的可追溯分析，不覆盖原始数据。本批具体实现见下方 `DeterministicJobAnalysis`；其余未来字段方向：
 
 - 分析标识；
 - 关联岗位和所依据观察版本；
@@ -102,6 +102,33 @@ schema version 3 的 `search_runs` 只在 `source.pageType === 'search_results'`
 
 用户审核状态属于用户事实，不能被 `JobAnalysis` 的模型或规则结论擅自替代。
 
+## `DeterministicJobAnalysis`
+
+schema version 4 新增 `deterministic_job_analyses`，独立于原始事实，当前规则版本为 `deterministic-job-analysis-v1`。
+
+| 列 | 含义 |
+| --- | --- |
+| `id` | INTEGER 自增主键 |
+| `job_id` | NOT NULL，指向 jobs |
+| `latest_observation_id` | NOT NULL，指向分析时 jobs.latest_observation_id；提供当前 title/header/tags |
+| `jd_observation_id` | nullable，指向同 Job 中 captured_at DESC、id DESC 的最近非空完整 JD；无 JD 为 NULL |
+| `rules_version` | 显式规则语义版本，不使用日期或 commit SHA |
+| `job_nature_status` | genuine_ecommerce_ops / mixed_ecommerce_ops / likely_non_ecommerce_ops / insufficient_evidence |
+| `experience_status` | no_requirement / preference_only / hard_minimum / contradictory / insufficient_evidence |
+| `hard_minimum_years` | JD 明确年限的最大值；未提取为 NULL，header 年限不填入此列 |
+| `analysis_json` | 完整结构化结果，读取必须 runtime validate |
+| `analyzed_at` | 本机分析记录创建时间，不替代 captured_at 或平台时间 |
+
+唯一键 `(job_id, latest_observation_id, rules_version)`。同键幂等，不更新旧分析；新 latest/rules 键追加历史。所有来源都有 observation 外键，repository 另核对 Job 归属。
+
+JSON 保存 jobId、rulesVersion、source、jobNature、experience 与 warnings。experience 包含标准化 header（kind/minYears/maxYears）、JD（status/hardMinimumValues/hasPreference/hasNoRequirement）、最终 status/hardMinimumYears、contradiction codes 和 evidence。无 JD 时两轴最终状态均为 insufficient_evidence，header 解析仍保留。
+
+Evidence 为 `code/source/section/excerpt`，excerpt 是最多 160 chars 的原文连续片段。full_jd 指向 jdObservationId，title/header_experience/tags 指向 latestObservationId。复用旧 JD 保存 `jd_from_older_observation`；多个不同硬年限保存 `multiple_hard_minimum_values`，并保留全部 evidence。具体阈值、否定、软偏好和矛盾语义见 [ADR-0012](decisions/ADR-0012-deterministic-job-analysis-v1.md)。
+
+`LocalDatabase.analyses` 提供 `analyzeJob(jobId)`、`getLatestForJob(jobId)`、`refreshAll()`。读取当前结果只匹配当前 latest/rules；尚未分析返回 null，损坏 JSON 或列/JSON 不一致抛固定错误。没有历史删除或人工覆写 API。
+
+导入源事实先 commit，再独立事务分析受影响 Jobs；启动 HTTP 后 refreshAll 补已有 Jobs；重复补齐不插重复行。分析异常不撤销采集、不阻止服务或保存，仅记录固定 generic diagnostic。Migration 不分析业务文本。
+
 ## 当前边界
 
-当前实现 Job identity/lifecycle、observation linking、ImportRun、SearchRun provenance 与幂等导入；不实现 observation dedupe、最终 aggregate facts、JobAnalysis、用户审核状态或自动 merge/reconciliation。Batch 5 实现等待外部审阅。
+当前实现 Job identity/lifecycle、observation linking、ImportRun、SearchRun provenance、幂等导入，以及独立确定性岗位性质和经验分析；不实现 observation dedupe、最终 aggregate facts、其余分析维度、用户审核状态或自动 merge/reconciliation。Phase 4 已获外部 PASS；Phase 5 / Batch 1 实现等待外部审阅。

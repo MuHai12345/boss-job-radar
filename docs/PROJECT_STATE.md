@@ -2,10 +2,10 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 4 / Batch 5`
-- 下一步骤：`Phase 4 / Batch 5 external review`
-- 当前状态：`Phase 4 - IN PROGRESS / NOT YET PASSED`
-- 已通过的最后 implementation commit：`06180775870ce0a36b0535e4a234addf381a4d88`
+- 当前阶段：`Phase 5 / Batch 1`
+- 下一步骤：`Phase 5 / Batch 1 external review`
+- 当前状态：`Phase 5 - IN PROGRESS / NOT YET PASSED`
+- 已通过的最后 implementation commit：`148f244a0501017a147889be3f31615f9e6b5c60`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
 - Phase 1 / Batch 1：`PASS`
@@ -39,21 +39,22 @@
 - Phase 3 / Batch 1：`PASS`
 - Phase 3 / Batch 2：`PASS`
 - Phase 3 / Batch 3：`PASS`
-- Phase 4：`IN PROGRESS / NOT YET PASSED`
+- Phase 4：`PASS`
 - Phase 4 / Batch 1：`PASS`
 - Phase 4 / Batch 2：`PASS`
 - Phase 4 / Batch 3：`PASS`
 - Phase 4 / Batch 4：`PASS`
-- Phase 4 / Batch 5：`implementation_complete_awaiting_external_review`
-- 核心能力矩阵：6 / 15 VERIFIED；1 项 IMPLEMENTED_AWAITING_REVIEW；8 项 NOT_STARTED
+- Phase 4 / Batch 5：`PASS`
+- Phase 5：`IN PROGRESS / NOT YET PASSED`
+- Phase 5 / Batch 1：`implementation_complete_awaiting_external_review`
+- 核心能力矩阵：7 / 15 VERIFIED；2 项 IMPLEMENTED_AWAITING_REVIEW；6 项 NOT_STARTED
 - Phase 3 implementation lineage：`b73dc43869764f4bbd4d9de6e22d75acc0baed5f` → `b667eaa222bc065f1faff254e7a2d4c640fbf86d` → `05e5b3e6441499a213544b6b6961ecefa765afac`
-- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 4 / Batch 5
-- 权限边界：Codex 无权自行宣布 Phase 4 / Batch 5 `PASS` 或开始下一批
+- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 5 / Batch 1
+- 权限边界：Codex 无权自行宣布 Phase 5 / Batch 1 `PASS` 或开始下一批
 - 仍未实现：
   - final Job aggregation
   - observation dedupe（按设计不实现）
   - AI
-  - deterministic job analysis
   - Dashboard
   - auto browsing
   - auto apply/chat
@@ -62,12 +63,12 @@
 
 这里的当前状态只表示：
 
-> 外部网页版 ChatGPT 已完成独立代码审阅和独立验收测试，并作出结论：Phase 3 / Batch 1 `PASS`、Phase 3 / Batch 2 `PASS`、Phase 3 / Batch 3 `PASS`，Phase 3 `PASS`，Phase 4 / Batch 1 `PASS`、Phase 4 / Batch 2 `PASS`、Phase 4 / Batch 3 `PASS`、Phase 4 / Batch 4 `PASS`。Phase 4 / Batch 5 已完成实现并等待外部审阅；Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
+> 依据本轮外部 Prompt，Phase 0–4 均已获外部 `PASS`，Phase 4 / Batch 1–5 全部 `PASS`。Phase 5 / Batch 1 的确定性岗位性质与经验要求分析已完成实现，等待外部审阅；Phase 5 为 `IN PROGRESS / NOT YET PASSED`。developer verification 不等于 external acceptance。
 
 该结论不表示：
 
 - verified selector 是 BOSS 官方或永久稳定的 contract；
-- Phase 4 / Batch 5 已通过外部验收；
+- Phase 5 / Batch 1 已通过外部验收；
 - observation dedupe、AI 或 Dashboard 已实现。
 
 Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
@@ -92,4 +93,16 @@ Phase 4 / Batch 5 将 schema 升至 version 3、bridge protocol 升至 version 2
 
 相同 clientImportId 与相同 payload 的 replay 返回原 observation IDs，关闭/重开数据库后仍然有效；不同 payload 返回 409 import_conflict。不同点击始终新增 observations，canonical Job 继续复用。搜索保存保留实际 matched count 与 saved count（例如 143/100）及 warning 原顺序；detail matched count 为 NULL 且不创建 SearchRun。空结果不连接 localhost。SearchRun 通过 ImportRun 和 observations 可追溯到本次观察到的 Jobs。
 
-客户端只对 POST 网络失败、响应 body 丢失或传输 timeout 最多重试一次，复用已序列化的同一 payload 和 UUID；400/403/409/413/500 不重试。session 与成功 POST 均验证 application/json Content-Type，允许 charset。Host、Origin、token、identity encoding、1 MiB body limit、loopback-only 和无 permissive CORS 边界保持不变，GET /health 不变。Batch 5 当前仅为 implementation_complete_awaiting_external_review；不进入下一批。
+客户端只对 POST 网络失败、响应 body 丢失或传输 timeout 最多重试一次，复用已序列化的同一 payload 和 UUID；400/403/409/413/500 不重试。session 与成功 POST 均验证 application/json Content-Type，允许 charset。Host、Origin、token、identity encoding、1 MiB body limit、loopback-only 和无 permissive CORS 边界保持不变，GET /health 不变。Batch 5 已获外部 PASS。
+
+## Phase 5 / Batch 1 实现状态
+
+- 新增 schema version 4：独立 `deterministic_job_analyses`，migration 不执行业务 backfill，不更新 JobObservation facts。
+- 规则版本：`deterministic-job-analysis-v1`。两轴为岗位性质四种状态、经验要求五种状态；无总分和 LLM。
+- source selection：latest pointer 提供当前 title/header/tags；从同 Job 全部历史按 captured_at DESC、id DESC 复用最近非空完整 JD，分别保存两个来源 ID。复用旧 JD 增加非阻塞 warning。
+- 简单 section detection、核心/偏离职责族、紧邻否定与保守聚合均已实现；要求段和 title/tags 作为上下文，不等同职责。
+- 经验解析保留 header、JD 显式硬年限/优先/无要求、原文 evidence 与矛盾。`1年以内` + `工作2年以上` 输出 contradictory、hardMinimumYears=2；`1-3年` + `1年经验优先` 保留软偏好，记录 mismatch，minimum=null。
+- `LocalDatabase.analyses` 提供 analyzeJob/getLatestForJob/refreshAll；同 latest/rules 幂等，新键追加历史；当前查询不返回 stale；存储 JSON 经 runtime validation 后读取。
+- ImportRun 源数据 commit 后再独立分析受影响 Jobs；HTTP listener 启动后 backfill 已有 Jobs。异常只记录固定 generic diagnostic，不撤销采集、不阻止服务或保存，可随后补齐。
+- 详细阈值、读取 contract 与限制见 [ADR-0012](decisions/ADR-0012-deterministic-job-analysis-v1.md)；开发命令和结果见 [本批工作日志](worklogs/2026-09-05-phase-5-batch-1-deterministic-analysis.md)。
+- 状态为 `implementation_complete_awaiting_external_review`；不开始下一批。

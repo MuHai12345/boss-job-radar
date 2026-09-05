@@ -2,6 +2,7 @@ import {
   openLocalDatabase,
   type LocalDatabase,
 } from './database/database.js';
+import { refreshAnalysisSafely } from './deterministic-analysis-refresh.js';
 import {
   startLocalService,
   type LocalService,
@@ -30,6 +31,8 @@ export async function startLocalRuntime(options: {
     database.close();
     throw error;
   }
+
+  refreshAnalysisSafely(() => database.analyses.refreshAll());
 
   let closePromise: Promise<void> | undefined;
   return {
