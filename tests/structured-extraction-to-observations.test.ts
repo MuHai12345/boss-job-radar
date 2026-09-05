@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { ParsedJobCard } from '../src/adapters/boss/job-card-types';
 import type { ParsedJobDetail } from '../src/adapters/boss/job-detail-types';
-import { mapStructuredExtractionToObservations } from '../src/bridge/structured-extraction-to-observations';
+import {
+  buildImportRequest,
+  mapStructuredExtractionToObservations,
+} from '../src/bridge/structured-extraction-to-observations';
 import type { StructuredPageExtractionResult } from '../src/page-extraction/structured-page-extraction-types';
 
 function createCard(overrides: Partial<ParsedJobCard> = {}): ParsedJobCard {
@@ -146,5 +149,79 @@ describe('mapStructuredExtractionToObservations', () => {
     }),
   ])('returns no observations when the extraction has no savable data', (result) => {
     expect(mapStructuredExtractionToObservations(result)).toEqual([]);
+  });
+});
+
+describe('buildImportRequest', () => {
+  it('builds search provenance from the structured result without normalization', () => {
+    const result = createResult({
+      matchedCardCount: 143,
+      warnings: ['card_limit_reached', 'no_job_cards'],
+    });
+    const before = structuredClone(result);
+
+    const request = buildImportRequest(
+      result,
+      '45cfa93c-1e8b-4dd0-9e16-b2f32a0358f5',
+    );
+
+    expect(request).not.toBeNull();
+    expect(request).toEqual({
+      clientImportId: '45cfa93c-1e8b-4dd0-9e16-b2f32a0358f5',
+      source: {
+        pageType: 'search_results',
+        pageUrl: result.pageUrl,
+        capturedAt: result.capturedAt,
+        matchedCardCount: 143,
+        warnings: ['card_limit_reached', 'no_job_cards'],
+      },
+      observations: mapStructuredExtractionToObservations(result),
+    });
+    expect(request?.source.warnings).not.toBe(result.warnings);
+    expect(result).toEqual(before);
+  });
+
+  it('builds detail provenance with a null matched count', () => {
+    const result = createResult({
+      pageType: 'job_detail',
+      pageUrl: 'https://www.zhipin.com/job_detail/detail.html',
+      matchedCardCount: null,
+      cards: [],
+      detail: createDetail(),
+      warnings: [],
+    });
+
+    expect(
+      buildImportRequest(result, 'b21830f8-a63e-4447-af36-819003a30dbe'),
+    ).toMatchObject({
+      source: {
+        pageType: 'job_detail',
+        pageUrl: result.pageUrl,
+        capturedAt: result.capturedAt,
+        matchedCardCount: null,
+        warnings: [],
+      },
+      observations: [{ pageType: 'job_detail' }],
+    });
+  });
+
+  it('keeps an empty supported extraction local and rejects unsupported provenance', () => {
+    const emptySearch = createResult({
+      cards: [],
+      matchedCardCount: 0,
+      warnings: ['no_job_cards'],
+    });
+    const unsupported = createResult({
+      pageType: 'unsupported',
+      matchedCardCount: null,
+      cards: [],
+    });
+
+    expect(
+      buildImportRequest(emptySearch, '7cf77b2e-2b41-4260-acf9-5b24fa29eaba'),
+    ).toMatchObject({ observations: [] });
+    expect(
+      buildImportRequest(unsupported, '093c2ffc-b4c9-4147-9917-fb4f605a7108'),
+    ).toBeNull();
   });
 });

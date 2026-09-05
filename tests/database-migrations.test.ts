@@ -53,13 +53,13 @@ function createObservation(
 }
 
 describe('SQLite migrations', () => {
-  it('applies schema version 2 to a fresh database and records it', () => {
+  it('applies schema version 3 to a fresh database and records it', () => {
     const database = new SqliteDatabase(':memory:');
 
     try {
       runMigrations(database);
 
-      expect(CURRENT_SCHEMA_VERSION).toBe(2);
+      expect(CURRENT_SCHEMA_VERSION).toBe(3);
       expect(
         database
           .prepare(
@@ -80,6 +80,13 @@ describe('SQLite migrations', () => {
           ),
           name: 'create_job_identity',
           version: 2,
+        },
+        {
+          applied_at: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+          ),
+          name: 'create_import_provenance',
+          version: 3,
         },
       ]);
     } finally {
@@ -130,12 +137,12 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (3, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (4, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
 
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 3 is newer than supported version 2',
+        'Database schema version 4 is newer than supported version 3',
       );
       expect(
         database
@@ -218,6 +225,7 @@ describe('job identity schema version 2', () => {
         { dflt_value: "'[]'", name: 'missing_fields_json', notnull: 1, pk: 0, type: 'TEXT' },
         { dflt_value: "'[]'", name: 'warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
         { dflt_value: null, name: 'job_id', notnull: 1, pk: 0, type: 'INTEGER' },
+        { dflt_value: null, name: 'import_run_id', notnull: 0, pk: 0, type: 'INTEGER' },
       ]);
     } finally {
       database.close();
@@ -493,6 +501,158 @@ describe('job identity schema version 2', () => {
         tags_json: '[]',
         warnings_json: '[]',
       });
+    } finally {
+      database.close();
+    }
+  });
+});
+
+describe('import provenance schema version 3', () => {
+  it('creates constrained import and search run tables plus the observation link', () => {
+    const database = openMigratedDatabase();
+
+    try {
+      const importColumns = database
+        .prepare("PRAGMA table_info('import_runs')")
+        .all() as TableColumn[];
+      const searchColumns = database
+        .prepare("PRAGMA table_info('search_runs')")
+        .all() as TableColumn[];
+
+      expect(importColumns.map(({ name, notnull, pk, type }) => ({
+        name,
+        notnull,
+        pk,
+        type,
+      }))).toEqual([
+        { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
+        { name: 'client_import_id', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'payload_sha256', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'page_type', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'source_page_url', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'captured_at', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'matched_card_count', notnull: 0, pk: 0, type: 'INTEGER' },
+        { name: 'extraction_warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'observation_count', notnull: 1, pk: 0, type: 'INTEGER' },
+        { name: 'created_at', notnull: 1, pk: 0, type: 'TEXT' },
+      ]);
+      expect(searchColumns.map(({ name, notnull, pk, type }) => ({
+        name,
+        notnull,
+        pk,
+        type,
+      }))).toEqual([
+        { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
+        { name: 'import_run_id', notnull: 1, pk: 0, type: 'INTEGER' },
+        { name: 'captured_at', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'source_page_url', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'matched_card_count', notnull: 1, pk: 0, type: 'INTEGER' },
+        { name: 'saved_observation_count', notnull: 1, pk: 0, type: 'INTEGER' },
+        { name: 'extraction_warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
+        { name: 'created_at', notnull: 1, pk: 0, type: 'TEXT' },
+      ]);
+      expect(
+        database.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_job_observations_import_run_id'",
+        ).get(),
+      ).toEqual({ name: 'idx_job_observations_import_run_id' });
+      expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('migrates version 2 data without changing Jobs, observations, or links', () => {
+    const database = new SqliteDatabase(':memory:');
+    database.pragma('foreign_keys = ON');
+    database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations VALUES
+        (1, 'create_job_observations', '2026-09-03T00:00:00.000Z'),
+        (2, 'create_job_identity', '2026-09-04T00:00:00.000Z');
+      CREATE TABLE jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_url TEXT NULL UNIQUE,
+        unresolved_observation_id INTEGER NULL UNIQUE,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        latest_observation_id INTEGER NOT NULL,
+        CHECK ((job_url IS NOT NULL AND unresolved_observation_id IS NULL) OR (job_url IS NULL AND unresolved_observation_id IS NOT NULL)),
+        FOREIGN KEY (unresolved_observation_id) REFERENCES job_observations(id) DEFERRABLE INITIALLY DEFERRED,
+        FOREIGN KEY (latest_observation_id) REFERENCES job_observations(id) DEFERRABLE INITIALLY DEFERRED
+      );
+      CREATE TABLE job_observations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        captured_at TEXT NOT NULL,
+        page_type TEXT NOT NULL CHECK (page_type IN ('search_results', 'job_detail')),
+        source_page_url TEXT NOT NULL,
+        job_href_raw TEXT NULL,
+        job_url TEXT NULL,
+        title TEXT NULL,
+        company_name TEXT NULL,
+        salary_text TEXT NULL,
+        location_text TEXT NULL,
+        experience_text TEXT NULL,
+        education_text TEXT NULL,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        recruiter_activity_text TEXT NULL,
+        published_text TEXT NULL,
+        full_jd_text TEXT NULL,
+        raw_text TEXT NOT NULL DEFAULT '',
+        missing_fields_json TEXT NOT NULL DEFAULT '[]',
+        warnings_json TEXT NOT NULL DEFAULT '[]',
+        job_id INTEGER NOT NULL REFERENCES jobs(id)
+      );
+      BEGIN;
+      PRAGMA defer_foreign_keys = ON;
+      INSERT INTO jobs VALUES (
+        7,
+        'https://www.zhipin.com/job_detail/existing.html',
+        NULL,
+        '2026-09-03T01:00:00.000Z',
+        '2026-09-03T01:00:00.000Z',
+        11
+      );
+      INSERT INTO job_observations (
+        id, captured_at, page_type, source_page_url, job_url, title,
+        tags_json, raw_text, missing_fields_json, warnings_json, job_id
+      ) VALUES (
+        11, '2026-09-03T01:00:00.000Z', 'search_results',
+        'https://www.zhipin.com/web/geek/jobs',
+        'https://www.zhipin.com/job_detail/existing.html', '保留岗位',
+        '["保留标签"]', '保留原文', '["salaryText"]', '["old_warning"]', 7
+      );
+      COMMIT;
+    `);
+
+    try {
+      const beforeJob = database.prepare('SELECT * FROM jobs').get();
+      const beforeObservation = database.prepare(`
+        SELECT id, captured_at, page_type, source_page_url, job_url, title,
+               tags_json, raw_text, missing_fields_json, warnings_json, job_id
+        FROM job_observations
+      `).get();
+
+      runMigrations(database);
+      runMigrations(database);
+
+      expect(database.prepare('SELECT * FROM jobs').get()).toEqual(beforeJob);
+      expect(database.prepare(`
+        SELECT id, captured_at, page_type, source_page_url, job_url, title,
+               tags_json, raw_text, missing_fields_json, warnings_json, job_id
+        FROM job_observations
+      `).get()).toEqual(beforeObservation);
+      expect(
+        database.prepare('SELECT import_run_id FROM job_observations').get(),
+      ).toEqual({ import_run_id: null });
+      expect(
+        database.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE version = 3').get(),
+      ).toEqual({ count: 1 });
+      expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
     } finally {
       database.close();
     }

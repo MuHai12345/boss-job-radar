@@ -23,7 +23,7 @@ export async function startLocalRuntime(options: {
   let service: LocalService;
   try {
     service = await startLocalService({
-      observations: database.observations,
+      imports: database.imports,
       port: options.port,
     });
   } catch (error) {

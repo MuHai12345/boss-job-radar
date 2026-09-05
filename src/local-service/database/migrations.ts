@@ -211,9 +211,72 @@ const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 3,
+    name: 'create_import_provenance',
+    up(database) {
+      database.exec(`
+        CREATE TABLE import_runs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          client_import_id TEXT NOT NULL UNIQUE,
+          payload_sha256 TEXT NOT NULL CHECK (
+            length(payload_sha256) = 64
+            AND payload_sha256 NOT GLOB '*[^0-9a-f]*'
+          ),
+          page_type TEXT NOT NULL CHECK (
+            page_type IN ('search_results', 'job_detail')
+          ),
+          source_page_url TEXT NOT NULL,
+          captured_at TEXT NOT NULL,
+          matched_card_count INTEGER NULL,
+          extraction_warnings_json TEXT NOT NULL,
+          observation_count INTEGER NOT NULL CHECK (observation_count > 0),
+          created_at TEXT NOT NULL,
+          CHECK (
+            (
+              page_type = 'search_results'
+              AND matched_card_count IS NOT NULL
+              AND matched_card_count >= 0
+            ) OR (
+              page_type = 'job_detail'
+              AND matched_card_count IS NULL
+            )
+          )
+        );
+
+        CREATE TABLE search_runs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          import_run_id INTEGER NOT NULL UNIQUE REFERENCES import_runs(id),
+          captured_at TEXT NOT NULL,
+          source_page_url TEXT NOT NULL,
+          matched_card_count INTEGER NOT NULL CHECK (matched_card_count >= 0),
+          saved_observation_count INTEGER NOT NULL CHECK (
+            saved_observation_count > 0
+          ),
+          extraction_warnings_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
+        ALTER TABLE job_observations
+        ADD COLUMN import_run_id INTEGER NULL REFERENCES import_runs(id);
+
+        CREATE INDEX idx_job_observations_import_run_id
+        ON job_observations(import_run_id);
+      `);
+
+      const foreignKeyViolation = database
+        .prepare('PRAGMA foreign_key_check')
+        .get();
+      if (foreignKeyViolation !== undefined) {
+        throw new Error(
+          'Import provenance migration produced invalid foreign keys',
+        );
+      }
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 interface MaximumVersionRow {
   readonly version: number | null;

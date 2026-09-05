@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
-import type { JobObservationInput } from './database/observation-repository.js';
+import type { ImportRequest } from '../shared/import-request-types.js';
+import { ImportConflictError } from './database/import-repository.js';
 import {
   createBridgeSessionToken,
   hasAllowedExtensionOrigin,
@@ -12,7 +13,7 @@ import {
 import {
   decodeJsonBody,
   readLimitedRequestBody,
-  validateObservationBatch,
+  validateImportRequest,
 } from './http/observation-ingestion.js';
 
 export const LOCAL_SERVICE_HOST = '127.0.0.1' as const;
@@ -36,8 +37,8 @@ export interface LocalService {
   close(): Promise<void>;
 }
 
-export interface ObservationAppender {
-  appendMany(inputs: readonly JobObservationInput[]): { ids: number[] };
+export interface ImportBatchWriter {
+  importBatch(request: ImportRequest): { ids: number[] };
 }
 
 function sendJson(
@@ -80,7 +81,7 @@ async function handleObservationRequest(
   request: IncomingMessage,
   response: ServerResponse,
   token: string,
-  observations: ObservationAppender,
+  imports: ImportBatchWriter,
 ): Promise<void> {
   if (!hasExpectedLoopbackHost(request)) {
     rejectWithoutReadingBody(request, response, 403, 'forbidden');
@@ -135,16 +136,20 @@ async function handleObservationRequest(
     return;
   }
 
-  const inputs = validateObservationBatch(body);
-  if (inputs === null) {
+  const importRequest = validateImportRequest(body);
+  if (importRequest === null) {
     sendJson(response, 400, { error: 'invalid_request' });
     return;
   }
 
   try {
-    const result = observations.appendMany(inputs);
+    const result = imports.importBatch(importRequest);
     sendJson(response, 201, { ids: result.ids });
-  } catch {
+  } catch (error) {
+    if (error instanceof ImportConflictError) {
+      sendJson(response, 409, { error: 'import_conflict' });
+      return;
+    }
     sendJson(response, 500, { error: 'internal_error' });
   }
 }
@@ -153,7 +158,7 @@ async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   token: string,
-  observations: ObservationAppender,
+  imports: ImportBatchWriter,
 ): Promise<void> {
   if (request.url === HEALTH_PATH) {
     handleHealthRequest(request, response);
@@ -174,7 +179,7 @@ async function handleRequest(
     }
 
     response.setHeader('Cache-Control', 'no-store');
-    sendJson(response, 200, { protocolVersion: 1, token });
+    sendJson(response, 200, { protocolVersion: 2, token });
     return;
   }
 
@@ -183,7 +188,7 @@ async function handleRequest(
       request,
       response,
       token,
-      observations,
+      imports,
     );
     return;
   }
@@ -193,7 +198,7 @@ async function handleRequest(
 }
 
 export async function startLocalService(options: {
-  readonly observations: ObservationAppender;
+  readonly imports: ImportBatchWriter;
   readonly port: number;
 }): Promise<LocalService> {
   const token = createBridgeSessionToken();
@@ -202,7 +207,7 @@ export async function startLocalService(options: {
       request,
       response,
       token,
-      options.observations,
+      options.imports,
     ).catch(() => {
       if (!response.headersSent) {
         sendJson(response, 500, { error: 'internal_error' });

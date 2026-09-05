@@ -68,6 +68,7 @@ describe('job observation repository', () => {
       expect(id).toBeGreaterThan(0);
       expect(database.observations.getById(id)).toEqual({
         id,
+        importRunId: null,
         jobId: expect.any(Number),
         ...input,
       });
@@ -87,11 +88,13 @@ describe('job observation repository', () => {
       expect(second.id).not.toBe(first.id);
       expect(database.observations.getById(first.id)).toEqual({
         id: first.id,
+        importRunId: null,
         jobId: expect.any(Number),
         ...input,
       });
       expect(database.observations.getById(second.id)).toEqual({
         id: second.id,
+        importRunId: null,
         jobId: expect.any(Number),
         ...input,
       });
@@ -112,11 +115,13 @@ describe('job observation repository', () => {
       expect(ids[1]).toBeGreaterThan(ids[0]!);
       expect(database.observations.getById(ids[0]!)).toEqual({
         id: ids[0],
+        importRunId: null,
         jobId: expect.any(Number),
         ...first,
       });
       expect(database.observations.getById(ids[1]!)).toEqual({
         id: ids[1],
+        importRunId: null,
         jobId: expect.any(Number),
         ...second,
       });
@@ -229,6 +234,7 @@ describe('job observation repository', () => {
 
     expect(recovered).toEqual({
       id: firstId,
+      importRunId: null,
       jobId: expect.any(Number),
       ...input,
     });
@@ -245,6 +251,7 @@ describe('job observation repository', () => {
       ).toEqual([
         { name: 'create_job_observations', version: 1 },
         { name: 'create_job_identity', version: 2 },
+        { name: 'create_import_provenance', version: 3 },
       ]);
       expect(
         inspectionConnection
@@ -264,6 +271,7 @@ describe('job observation repository', () => {
       const first = database.observations.append(input);
       expect(database.observations.getById(first.id)).toEqual({
         id: first.id,
+        importRunId: null,
         jobId: expect.any(Number),
         ...input,
       });

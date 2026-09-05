@@ -11,11 +11,11 @@ import { startLocalRuntime } from '../src/local-service/runtime';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
-  type ObservationAppender,
+  type ImportBatchWriter,
 } from '../src/local-service/server';
 
-const TEST_OBSERVATION_APPENDER: ObservationAppender = {
-  appendMany() {
+const TEST_IMPORT_WRITER: ImportBatchWriter = {
+  importBatch() {
     return { ids: [] };
   },
 };
@@ -65,7 +65,7 @@ function sendHealthRequest(port: number): Promise<{
 }
 
 describe('local runtime lifecycle', () => {
-  it('creates a SQLite database with schema migration version 2', async () => {
+  it('creates a SQLite database with schema migration version 3', async () => {
     const databasePath = await createTemporaryDatabasePath();
     const runtime = await startLocalRuntime({ databasePath, port: 0 });
 
@@ -74,12 +74,12 @@ describe('local runtime lifecycle', () => {
         readonly: true,
       });
       try {
-        expect(CURRENT_SCHEMA_VERSION).toBe(2);
+        expect(CURRENT_SCHEMA_VERSION).toBe(3);
         expect(
           inspectionConnection
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all(),
-        ).toEqual([{ version: 1 }, { version: 2 }]);
+        ).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
       } finally {
         inspectionConnection.close();
       }
@@ -133,7 +133,7 @@ describe('local runtime lifecycle', () => {
 
   it('closes SQLite when HTTP startup fails', async () => {
     const occupiedService = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
     const databasePath = await createTemporaryDatabasePath();
@@ -155,7 +155,7 @@ describe('local runtime lifecycle', () => {
 
   it('does not leave an HTTP listener when database startup fails', async () => {
     const releasedService = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
     const port = releasedService.address.port;
@@ -170,7 +170,7 @@ describe('local runtime lifecycle', () => {
     ).rejects.toThrow();
 
     const replacementService = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port,
     });
     await replacementService.close();

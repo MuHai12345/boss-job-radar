@@ -1,5 +1,6 @@
 import type { StructuredPageExtractionResult } from '../page-extraction/structured-page-extraction-types';
 import type { JobObservationInput } from '../shared/job-observation-types';
+import type { ImportRequest } from '../shared/import-request-types';
 
 export function mapStructuredExtractionToObservations(
   result: StructuredPageExtractionResult,
@@ -54,4 +55,28 @@ export function mapStructuredExtractionToObservations(
   }
 
   return [];
+}
+
+export function buildImportRequest(
+  result: StructuredPageExtractionResult,
+  clientImportId: string,
+): ImportRequest | null {
+  if (
+    result.pageType !== 'search_results' &&
+    result.pageType !== 'job_detail'
+  ) {
+    return null;
+  }
+
+  return {
+    clientImportId,
+    source: {
+      pageType: result.pageType,
+      pageUrl: result.pageUrl,
+      capturedAt: result.capturedAt,
+      matchedCardCount: result.matchedCardCount,
+      warnings: [...result.warnings],
+    },
+    observations: mapStructuredExtractionToObservations(result),
+  };
 }

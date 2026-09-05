@@ -1,7 +1,7 @@
 import { classifyPageUrl, type PageKind } from '../../src/page-context';
-import { mapStructuredExtractionToObservations } from '../../src/bridge/structured-extraction-to-observations';
+import { buildImportRequest } from '../../src/bridge/structured-extraction-to-observations';
 import type { LocalServiceSaveResult } from '../../src/bridge/local-service-client';
-import type { JobObservationInput } from '../../src/shared/job-observation-types';
+import type { ImportRequest } from '../../src/shared/import-request-types';
 import type { ManualDomProbeResult } from '../../src/manual-validation/dom-probe-types';
 import {
   requestManualDomProbe,
@@ -50,8 +50,9 @@ export interface PopupDependencies {
   executeProbe: ExecuteManualProbe;
   executeTargetedProbe: ExecuteTargetedProbe;
   executeStructuredExtraction: ExecuteStructuredPageExtraction;
+  createClientImportId?: () => string;
   saveObservations: (
-    observations: readonly JobObservationInput[],
+    request: ImportRequest,
   ) => Promise<LocalServiceSaveResult>;
 }
 
@@ -388,17 +389,21 @@ export async function initializePopup(
           return;
         }
 
-        const observations = mapStructuredExtractionToObservations(
+        const importRequest = buildImportRequest(
           outcome.result,
+          (dependencies.createClientImportId ?? (() => crypto.randomUUID()))(),
         );
-        if (observations.length === 0) {
+        if (
+          importRequest === null ||
+          importRequest.observations.length === 0
+        ) {
           saveStatus.textContent = '当前页面没有可保存的岗位数据。';
           return;
         }
 
         let saveResult: LocalServiceSaveResult;
         try {
-          saveResult = await dependencies.saveObservations(observations);
+          saveResult = await dependencies.saveObservations(importRequest);
         } catch {
           saveStatus.textContent = '本地服务未启动或无法连接。';
           return;

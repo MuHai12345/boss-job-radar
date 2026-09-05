@@ -11,7 +11,7 @@ import {
 import type { ManualDomProbeResult } from '../src/manual-validation/dom-probe-types';
 import type { TargetedDomProbeResult } from '../src/manual-validation/targeted-dom-probe-types';
 import type { StructuredPageExtractionResult } from '../src/page-extraction/structured-page-extraction-types';
-import type { JobObservationInput } from '../src/shared/job-observation-types';
+import type { ImportRequest } from '../src/shared/import-request-types';
 
 const popupHtml = readFileSync(
   fileURLToPath(new URL('../entrypoints/popup/index.html', import.meta.url)),
@@ -92,9 +92,9 @@ function createPopupDocument(): Document {
 }
 
 async function successfulNoopSave(
-  observations: readonly JobObservationInput[],
+  request: ImportRequest,
 ): Promise<{ readonly ok: true; readonly count: number }> {
-  return { ok: true, count: observations.length };
+  return { ok: true, count: request.observations.length };
 }
 
 describe('popup controller', () => {
@@ -568,6 +568,9 @@ describe('popup controller', () => {
       .mockResolvedValueOnce(firstResult)
       .mockResolvedValueOnce(secondResult);
     const saveObservations = vi.fn().mockResolvedValue({ ok: true, count: 1 });
+    const createClientImportId = vi
+      .fn()
+      .mockReturnValue('79cedb05-cf09-4900-a2ee-a14d0c520e30');
 
     await initializePopup(elements, {
       version: '0.1.0',
@@ -575,6 +578,7 @@ describe('popup controller', () => {
       executeProbe: vi.fn(),
       executeTargetedProbe: vi.fn(),
       executeStructuredExtraction,
+      createClientImportId,
       saveObservations,
     });
 
@@ -586,9 +590,18 @@ describe('popup controller', () => {
     expect(getActiveTab).toHaveBeenCalledTimes(3);
     expect(executeStructuredExtraction).toHaveBeenNthCalledWith(1, 7);
     expect(executeStructuredExtraction).toHaveBeenNthCalledWith(2, 8);
-    expect(saveObservations.mock.calls[0]?.[0]).toMatchObject([
-      { title: '岗位 B', rawText: '岗位 B raw' },
-    ]);
+    expect(createClientImportId).toHaveBeenCalledOnce();
+    expect(saveObservations.mock.calls[0]?.[0]).toMatchObject({
+      clientImportId: '79cedb05-cf09-4900-a2ee-a14d0c520e30',
+      source: {
+        pageType: 'search_results',
+        pageUrl: secondResult.pageUrl,
+        capturedAt: secondResult.capturedAt,
+        matchedCardCount: secondResult.matchedCardCount,
+        warnings: secondResult.warnings,
+      },
+      observations: [{ title: '岗位 B', rawText: '岗位 B raw' }],
+    });
     expect(elements.saveStatus.textContent).toBe('已保存 1 条岗位记录到本地。');
   });
 
@@ -618,6 +631,44 @@ describe('popup controller', () => {
       ),
     );
     expect(saveObservations).not.toHaveBeenCalled();
+  });
+
+  it('creates a fresh client import ID for each new save click', async () => {
+    const document = createPopupDocument();
+    const elements = findPopupElements(document)!;
+    const createClientImportId = vi
+      .fn()
+      .mockReturnValueOnce('ed3cdf70-5318-45bc-9fe0-e47686e71e10')
+      .mockReturnValueOnce('d9aa6dc1-7ec8-46a3-9bb6-97dc3a203d5b');
+    const saveObservations = vi.fn().mockResolvedValue({ ok: true, count: 1 });
+
+    await initializePopup(elements, {
+      version: '0.1.0',
+      getActiveTab: async () => ({
+        id: 7,
+        url: savableExtractionResult.pageUrl,
+      }),
+      executeProbe: vi.fn(),
+      executeTargetedProbe: vi.fn(),
+      executeStructuredExtraction: vi
+        .fn()
+        .mockResolvedValue(savableExtractionResult),
+      createClientImportId,
+      saveObservations,
+    });
+
+    elements.saveButton.click();
+    await vi.waitFor(() => expect(saveObservations).toHaveBeenCalledTimes(1));
+    elements.saveButton.click();
+    await vi.waitFor(() => expect(saveObservations).toHaveBeenCalledTimes(2));
+
+    expect(createClientImportId).toHaveBeenCalledTimes(2);
+    expect(saveObservations.mock.calls.map(([request]) =>
+      (request as ImportRequest).clientImportId,
+    )).toEqual([
+      'ed3cdf70-5318-45bc-9fe0-e47686e71e10',
+      'd9aa6dc1-7ec8-46a3-9bb6-97dc3a203d5b',
+    ]);
   });
 
   it('shows a stable generic bridge failure and restores the save button', async () => {
@@ -670,7 +721,7 @@ describe('popup controller', () => {
     const executeStructuredExtraction = vi.fn().mockResolvedValue(limitedResult);
     const saveObservations = vi.fn<
       (
-        observations: readonly JobObservationInput[],
+        request: ImportRequest,
       ) => Promise<{ ok: true; count: number }>
     >(
       () =>
@@ -693,7 +744,13 @@ describe('popup controller', () => {
     await vi.waitFor(() => expect(saveObservations).toHaveBeenCalledTimes(1));
     expect(getActiveTab).toHaveBeenCalledTimes(2);
     expect(executeStructuredExtraction).toHaveBeenCalledTimes(1);
-    expect(saveObservations.mock.calls[0]?.[0]).toHaveLength(100);
+    expect(saveObservations.mock.calls[0]?.[0]).toMatchObject({
+      source: {
+        matchedCardCount: 101,
+        warnings: ['card_limit_reached'],
+      },
+    });
+    expect(saveObservations.mock.calls[0]?.[0].observations).toHaveLength(100);
     expect(elements.saveButton.disabled).toBe(true);
 
     resolveSave({ ok: true, count: 100 });

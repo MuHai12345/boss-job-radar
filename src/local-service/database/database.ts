@@ -9,9 +9,14 @@ import {
   createJobRepository,
   type JobRepository,
 } from './job-repository.js';
+import {
+  createImportRepository,
+  type ImportRepository,
+} from './import-repository.js';
 
 export interface LocalDatabase {
   readonly jobs: JobRepository;
+  readonly imports: ImportRepository;
   readonly observations: JobObservationRepository;
   isForeignKeyEnforcementEnabled(): boolean;
   close(): void;
@@ -22,6 +27,7 @@ export function openLocalDatabase(options: {
 }): LocalDatabase {
   const database = new SqliteDatabase(options.path);
   let jobs: JobRepository;
+  let imports: ImportRepository;
   let observations: JobObservationRepository;
 
   try {
@@ -29,6 +35,7 @@ export function openLocalDatabase(options: {
     runMigrations(database);
     jobs = createJobRepository(database);
     observations = createJobObservationRepository(database);
+    imports = createImportRepository(database, observations);
   } catch (error) {
     database.close();
     throw error;
@@ -37,6 +44,7 @@ export function openLocalDatabase(options: {
   let closed = false;
   return {
     jobs,
+    imports,
     observations,
     isForeignKeyEnforcementEnabled(): boolean {
       return database.pragma('foreign_keys', { simple: true }) === 1;

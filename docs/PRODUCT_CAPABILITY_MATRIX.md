@@ -20,8 +20,8 @@
 | 3 | 本地 SQLite persistence / migration / recovery | `VERIFIED` |
 | 4 | 安全 localhost observation ingestion | `VERIFIED` |
 | 5 | 手动 extension → localhost save | `VERIFIED` |
-| 6 | Job identity / dedupe / first_seen / last_seen | `IMPLEMENTED_AWAITING_REVIEW` |
-| 7 | SearchRun / provenance / idempotent import | `NOT_STARTED` |
+| 6 | Job identity / dedupe / first_seen / last_seen | `VERIFIED` |
+| 7 | SearchRun / provenance / idempotent import | `IMPLEMENTED_AWAITING_REVIEW` |
 | 8 | 确定性岗位真实性质识别 | `NOT_STARTED` |
 | 9 | 经验硬门槛 / 偏好 / 矛盾识别 | `NOT_STARTED` |
 | 10 | 招聘者活跃 / 新鲜度 / link 状态判断 | `NOT_STARTED` |
@@ -31,4 +31,6 @@
 | 14 | 搜索覆盖统计 / 稳定性 / backup recovery | `NOT_STARTED` |
 | 15 | 列表薪资 PUA 可信解码与正式产品链路接入 | `NOT_STARTED` |
 
-本矩阵只记录已获外部结论或当前批次真实实现状态。Phase 4 / Batch 3 已通过外部验收；Phase 4 / Batch 4 已完成实现并等待外部独立审阅，后续能力未提前标记完成。
+核心能力共 15 项：6 项 `VERIFIED`，1 项 `IMPLEMENTED_AWAITING_REVIEW`，8 项 `NOT_STARTED`。
+
+本矩阵只记录已获外部结论或当前批次真实实现状态。Phase 4 / Batch 1–4 已通过外部验收；Phase 4 / Batch 5 已完成实现并等待外部独立审阅，后续能力未提前标记完成。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。

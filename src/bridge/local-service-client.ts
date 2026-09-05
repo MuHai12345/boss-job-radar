@@ -1,4 +1,4 @@
-import type { JobObservationInput } from '../shared/job-observation-types';
+import type { ImportRequest } from '../shared/import-request-types';
 
 export const LOCAL_SERVICE_BASE_URL = 'http://127.0.0.1:32123';
 const REQUEST_TIMEOUT_MS = 5_000;
@@ -9,6 +9,7 @@ export type LocalServiceSaveFailureCode =
   | 'incompatible_version'
   | 'invalid_data'
   | 'invalid_session'
+  | 'import_conflict'
   | 'payload_too_large'
   | 'save_failed'
   | 'invalid_response';
@@ -42,6 +43,11 @@ const failures: Record<LocalServiceSaveFailureCode, LocalServiceSaveResult> = {
     code: 'invalid_session',
     message: '本地服务会话无效，请重新保存。',
   },
+  import_conflict: {
+    ok: false,
+    code: 'import_conflict',
+    message: '本次保存请求与本地记录冲突，请重新保存。',
+  },
   payload_too_large: {
     ok: false,
     code: 'payload_too_large',
@@ -67,15 +73,21 @@ async function fetchWithTimeout(
   fetchImplementation: typeof fetch,
   input: string,
   init: RequestInit,
-): Promise<Response> {
+): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    return await fetchImplementation(input, {
+    const response = await fetchImplementation(input, {
       ...init,
       signal: controller.signal,
     });
+    // Consume successful bodies before ending the timeout. HTTP failures are
+    // definitive and never depend on reading (or retrying) their error body.
+    const body = response.status === (init.method === 'GET' ? 200 : 201)
+      ? await readJson(response)
+      : undefined;
+    return { status: response.status, body };
   } finally {
     clearTimeout(timeout);
   }
@@ -87,6 +99,8 @@ function failureForStatus(status: number): LocalServiceSaveResult {
       return failures.invalid_data;
     case 403:
       return failures.invalid_session;
+    case 409:
+      return failures.import_conflict;
     case 413:
       return failures.payload_too_large;
     case 500:
@@ -97,18 +111,31 @@ function failureForStatus(status: number): LocalServiceSaveResult {
 }
 
 async function readJson(response: Response): Promise<unknown | undefined> {
+  const contentType = response.headers.get('Content-Type');
+  if (
+    contentType === null ||
+    contentType.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json'
+  ) {
+    return undefined;
+  }
+
+  // Stream failures are transport failures; complete invalid JSON is a bad
+  // response. Only the former can trigger a POST replay.
+  const body = await response.text();
   try {
-    return (await response.json()) as unknown;
+    return JSON.parse(body) as unknown;
   } catch {
     return undefined;
   }
 }
 
-export async function saveObservationsToLocalService(
-  observations: readonly JobObservationInput[],
+export async function saveImportRequestToLocalService(
+  importRequest: ImportRequest,
   fetchImplementation: typeof fetch = globalThis.fetch,
 ): Promise<LocalServiceSaveResult> {
-  let sessionResponse: Response;
+  const payload = JSON.stringify(importRequest);
+  const observationCount = importRequest.observations.length;
+  let sessionResponse: Awaited<ReturnType<typeof fetchWithTimeout>>;
   try {
     sessionResponse = await fetchWithTimeout(
       fetchImplementation,
@@ -123,7 +150,7 @@ export async function saveObservationsToLocalService(
     return failureForStatus(sessionResponse.status);
   }
 
-  const session = await readJson(sessionResponse);
+  const session = sessionResponse.body;
   if (
     !isRecord(session) ||
     Object.keys(session).length !== 2 ||
@@ -132,28 +159,36 @@ export async function saveObservationsToLocalService(
   ) {
     return failures.invalid_response;
   }
-  if (session.protocolVersion !== 1) {
+  if (session.protocolVersion !== 2) {
     return failures.incompatible_version;
   }
   if (typeof session.token !== 'string' || !TOKEN_PATTERN.test(session.token)) {
     return failures.invalid_response;
   }
 
-  let saveResponse: Response;
-  try {
-    saveResponse = await fetchWithTimeout(
-      fetchImplementation,
-      `${LOCAL_SERVICE_BASE_URL}/observations`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Boss-Job-Radar-Token': session.token,
-        },
-        body: JSON.stringify({ observations }),
-      },
-    );
-  } catch {
+  const postInit: RequestInit = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Boss-Job-Radar-Token': session.token,
+    },
+    body: payload,
+  };
+  let saveResponse: Awaited<ReturnType<typeof fetchWithTimeout>> | undefined;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      saveResponse = await fetchWithTimeout(
+        fetchImplementation,
+        `${LOCAL_SERVICE_BASE_URL}/observations`,
+        postInit,
+      );
+      break;
+    } catch {
+      // A sent POST with no response has an unknown result. Protocol v2 makes
+      // exactly one replay with the same immutable import request safe.
+    }
+  }
+  if (saveResponse === undefined) {
     return failures.unavailable;
   }
 
@@ -161,12 +196,12 @@ export async function saveObservationsToLocalService(
     return failureForStatus(saveResponse.status);
   }
 
-  const saveResult = await readJson(saveResponse);
+  const saveResult = saveResponse.body;
   if (
     !isRecord(saveResult) ||
     Object.keys(saveResult).length !== 1 ||
     !Array.isArray(saveResult.ids) ||
-    saveResult.ids.length !== observations.length ||
+    saveResult.ids.length !== observationCount ||
     !saveResult.ids.every(
       (id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0,
     )
@@ -174,5 +209,5 @@ export async function saveObservationsToLocalService(
     return failures.invalid_response;
   }
 
-  return { ok: true, count: observations.length };
+  return { ok: true, count: observationCount };
 }

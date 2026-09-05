@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 
-import { saveObservationsToLocalService } from '../../src/bridge/local-service-client';
+import { saveImportRequestToLocalService } from '../../src/bridge/local-service-client';
 import { verifiedBossJobDetailSelectorProfile } from '../../src/adapters/boss/job-detail-selector-profile';
 import { verifiedBossJobCardSelectorProfile } from '../../src/adapters/boss/selector-profile';
 import { runManualDomProbe } from '../../src/manual-validation/dom-probe';
@@ -57,5 +57,6 @@ void initializePopup(elements, {
     });
     return injectionResult?.result;
   },
-  saveObservations: saveObservationsToLocalService,
+  createClientImportId: () => crypto.randomUUID(),
+  saveObservations: saveImportRequestToLocalService,
 });

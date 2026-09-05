@@ -6,9 +6,9 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**Phase 3、Phase 4 / Batch 1、Batch 2 与 Batch 3 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 4 为 `implementation_complete_awaiting_external_review`。**
+**Phase 3、Phase 4 / Batch 1、Batch 2、Batch 3 与 Batch 4 均已由外部网页版 ChatGPT 验收为 `PASS`。Phase 4 当前为 `IN PROGRESS / NOT YET PASSED`；Phase 4 / Batch 5 为 `implementation_complete_awaiting_external_review`。**
 
-当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，以及等待外部审阅的持久化 Job identity / canonical URL dedupe。仍未实现 SearchRun、AI 和 Dashboard。
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，已通过外部验收的持久化 Job identity / canonical URL dedupe，以及等待外部审阅的 ImportRun、SearchRun provenance 与幂等请求重放。仍未实现 AI 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -16,7 +16,7 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 新增 **Manual Structured Current-Page Extraction**：“解析当前岗位数据”仅在 `/web/geek/jobs` 或单层 `/job_detail/*.html` 页面可用，并且必须由用户点击。它只读取当前 DOM 中已验证的岗位字段，结果暂时只显示为 popup JSON；不保存、不上传、不自动导航、不自动浏览，也不是后台采集器。
 
-新增独立 **Manual Local Save**：“保存当前岗位数据到本地”只在相同的受支持页面可用。每次点击都会重新取得活动标签页并重新执行 structured extraction，不复用 popup 中此前显示的 JSON；随后在 extension context 将纯 mapping 生成的 `JobObservationInput[]` 发送到固定 `http://127.0.0.1:32123`。空结果不会访问 localhost。每次保存重新获取一次 ephemeral session，GET 与 POST 各自 5 秒 timeout 且不自动重试；token 不持久化、不显示，成功 UI 只显示保存条数。
+新增独立 **Manual Local Save**：“保存当前岗位数据到本地”只在相同的受支持页面可用。每次点击都会重新取得活动标签页并重新执行 structured extraction，不复用 popup 中此前显示的 JSON；随后在 extension context 将纯 builder 生成的 protocol 2 envelope（`clientImportId`、`source`、`observations`）发送到固定 `http://127.0.0.1:32123`。空结果不会访问 localhost。每次保存 fresh 生成 `crypto.randomUUID()` 并获取 protocol 2 ephemeral session；UUID 与 token 只保留在当前调用内存。GET 与 POST 各自 5 秒 timeout 覆盖响应 body；POST 网络结果未知时最多复用相同 payload/UUID/token 重试一次，HTTP 错误不重试。session 与成功响应必须是 `application/json`（允许 charset），成功 UI 只显示保存条数。
 
 Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 roots，并以固定节点、深度和文本上限输出结构摘要。用户已完成搜索页和多个详情页的人工 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对；仓库现包含与 synthetic profiles 分离的 verified BOSS selector profiles，以及由脱敏 real-shape fixtures 驱动的纯 parser 测试。
 
@@ -26,8 +26,11 @@ Targeted Probe 只在 `manual-validation` 中使用已人工确认的诊断 root
 
 本地存储使用 `better-sqlite3` `13.0.3`。production database 固定命名为 `boss-job-radar.sqlite3`，位于用户级 OS data directory 下的 `boss-job-radar` 子目录；production 不接受任意 database path override。底层 API 和测试仍显式传入 path。打开连接时启用 SQLite foreign keys 并自动运行显式 ordered migrations。schema version 2 新增小型 `jobs` identity/lifecycle 表及 `job_observations.job_id` 关联；迁移会按已保存的非 NULL `job_url` exact equality 回填 canonical Job，NULL URL observation 各自建立 unresolved Job。observation 继续永久 append-only，`jobs` 不复制 title、company、salary 或 JD 等事实字段。有限 repository 支持 observation `append` / transactional `appendMany` / `getById` 与 Job `getById` / `findByJobUrl`；每次成功 append 都在同一事务内完成 observation 插入、Job resolve/create、link 与 first/last/latest 更新。
 
-local service 每次启动都会在进程内生成新的高熵 bridge session token。`GET /bridge/session` 只在严格匹配当前 `127.0.0.1:<actual-port>` Host 时返回 protocol version 和当前 token，并设置 `Cache-Control: no-store`。`POST /observations` 还要求 extension-only Origin（当 Origin 存在时）、custom token header、`application/json`、identity encoding、1 MiB 实收 body 上限和严格 `JobObservationInput[]` DTO；每批最多 100 条，并通过单一 SQLite transaction 按输入顺序 append。服务不提供 permissive CORS，错误响应不回显 token、请求 payload、SQL 或数据库路径。
+local service 每次启动都会在进程内生成新的高熵 bridge session token。`GET /bridge/session` 只在严格匹配当前 `127.0.0.1:<actual-port>` Host 时返回 protocol version 和当前 token，并设置 `Cache-Control: no-store`。`POST /observations` 还要求 extension-only Origin（当 Origin 存在时）、custom token header、`application/json`、identity encoding、1 MiB 实收 body 上限和严格 protocol 2 envelope DTO 与 source/observation 一致性校验；每批最多 100 条，并通过有限 ImportRepository 在单一 SQLite transaction 中完成 provenance、observation append 和 Job lifecycle。服务不提供 permissive CORS，错误响应不回显 token、请求 payload、SQL 或数据库路径。
 
+当前 schema version 3 在既有 Job linking 基础上新增 `import_runs`、`search_runs` 与 nullable `job_observations.import_run_id`。历史 observation 保持 unknown provenance（NULL），不猜测历史 runs。每次新的保存动作创建 ImportRun，搜索页同时创建一个 SearchRun；详情页 matched count 为 NULL，不创建 SearchRun。source 直接来自 structured extraction，保留页面、capturedAt、matchedCardCount 和 warning 原值、原顺序；例如 143 张 matched / 100 条 saved 分别保留。通过 SearchRun → ImportRun → observations → job_id 可追溯本次观察到的 Jobs。
+
+相同 `clientImportId` 与相同 payload 使用固定字段 serialization 的 SHA-256 识别重放，并返回第一次成功产生的 observation IDs（数据库重开后仍有效）；相同 ID 与不同 payload 返回 `409 { "error": "import_conflict" }`，不写入。不同用户点击生成新 UUID，即使页面不变仍新增 observations，canonical Job 继续复用。ImportRun、SearchRun、observations 和 Job lifecycle 任一步失败全部 rollback。local service 与 extension 需同时升级至 protocol 2，不兼容 protocol 1；`GET /health` 不变。
 ## 文档入口
 
 - [产品宪章](docs/PRODUCT_CHARTER.md)
@@ -78,8 +81,8 @@ npm run verify:manifests
 - 不自动投递、自动打招呼、自动聊天、自动翻页或后台无人值守浏览。
 - 不进行后台自动采集，不自动打开岗位详情，不自动点击“查看更多信息”。
 - 当前 HTTP 服务固定 loopback-only，`GET /health` contract 不变，并新增受严格 Host、Origin、token、media type、body size 和 DTO validation 保护的 observation ingestion；没有 permissive CORS。
-- 当前 SQLite schema version 2 包含 production OS data path policy、ordered transactional migration、append-only observations、Job identity/lifecycle、canonical URL exact-match dedupe、unresolved policy 和有限 repositories；没有 observation dedupe、SearchRun、final aggregate facts、AI 或 Dashboard。
-- 当前 extension host permission 仅为 `http://127.0.0.1:32123/*`；没有其他 localhost 范围、`<all_urls>`、自动采集、SearchRun、AI 或 Dashboard。
+- 当前 SQLite schema version 3 包含 production OS data path policy、ordered transactional migration、append-only observations、Job identity/lifecycle、canonical URL exact-match dedupe、unresolved policy、ImportRun / SearchRun provenance、幂等导入和有限 repositories；没有 observation dedupe、final aggregate facts、AI 或 Dashboard。
+- 当前 extension host permission 仅为 `http://127.0.0.1:32123/*`；没有其他 localhost 范围、`<all_urls>`、自动采集、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 3、Phase 4 / Batch 1、Batch 2 与 Batch 3 已通过外部验收；Phase 4 / Batch 4 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。
+Phase 3、Phase 4 / Batch 1、Batch 2、Batch 3 与 Batch 4 已通过外部验收；Phase 4 / Batch 5 已完成实现并等待外部网页版 ChatGPT 独立审阅，尚未获得 `PASS`。Phase 4 仍为 `IN PROGRESS / NOT YET PASSED`。

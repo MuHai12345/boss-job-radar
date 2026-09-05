@@ -5,12 +5,17 @@ export type { JobObservationInput } from '../../shared/job-observation-types.js'
 
 export interface JobObservationRecord extends JobObservationInput {
   readonly id: number;
+  readonly importRunId: number | null;
   readonly jobId: number;
 }
 
 export interface JobObservationRepository {
   append(input: JobObservationInput): { id: number };
   appendMany(inputs: readonly JobObservationInput[]): { ids: number[] };
+  appendManyForImport(
+    importRunId: number,
+    inputs: readonly JobObservationInput[],
+  ): { ids: number[] };
   getById(id: number): JobObservationRecord | null;
 }
 
@@ -22,6 +27,7 @@ interface JobObservationRow {
   readonly job_href_raw: string | null;
   readonly job_url: string | null;
   readonly job_id: number | null;
+  readonly import_run_id: number | null;
   readonly title: string | null;
   readonly company_name: string | null;
   readonly salary_text: string | null;
@@ -133,8 +139,9 @@ export function createJobObservationRepository(
       raw_text,
       missing_fields_json,
       warnings_json,
-      job_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      job_id,
+      import_run_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectObservationById = database.prepare(`
     SELECT
@@ -145,6 +152,7 @@ export function createJobObservationRepository(
       job_href_raw,
       job_url,
       job_id,
+      import_run_id,
       title,
       company_name,
       salary_text,
@@ -224,7 +232,10 @@ export function createJobObservationRepository(
     WHERE id = ?
   `);
 
-  const appendOne = (input: JobObservationInput): number => {
+  const appendOne = (
+    input: JobObservationInput,
+    importRunId: number | null,
+  ): number => {
     const nextObservation = selectNextObservationId.get() as {
       readonly id: number;
     };
@@ -279,6 +290,7 @@ export function createJobObservationRepository(
       JSON.stringify(input.missingFields),
       JSON.stringify(input.warnings),
       jobId,
+      importRunId,
     );
 
     if (updateExistingCanonical) {
@@ -305,11 +317,15 @@ export function createJobObservationRepository(
     return observationId;
   };
   const appendSingle = database.transaction(
-    (input: JobObservationInput): number => appendOne(input),
+    (input: JobObservationInput): number => appendOne(input, null),
   );
   const appendBatch = database.transaction(
     (inputs: readonly JobObservationInput[]): number[] =>
-      inputs.map((input) => appendOne(input)),
+      inputs.map((input) => appendOne(input, null)),
+  );
+  const appendImportBatch = database.transaction(
+    (importRunId: number, inputs: readonly JobObservationInput[]): number[] =>
+      inputs.map((input) => appendOne(input, importRunId)),
   );
 
   return {
@@ -319,6 +335,11 @@ export function createJobObservationRepository(
 
     appendMany(inputs): { ids: number[] } {
       return { ids: appendBatch.immediate(inputs) };
+    },
+
+    appendManyForImport(importRunId, inputs): { ids: number[] } {
+      validateRequestedId(importRunId);
+      return { ids: appendImportBatch.immediate(importRunId, inputs) };
     },
 
     getById(id): JobObservationRecord | null {
@@ -341,6 +362,7 @@ export function createJobObservationRepository(
         experienceText: row.experience_text,
         fullJdText: row.full_jd_text,
         id: row.id,
+        importRunId: row.import_run_id,
         jobHrefRaw: row.job_href_raw,
         jobId: row.job_id,
         jobUrl: row.job_url,

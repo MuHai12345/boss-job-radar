@@ -5,11 +5,11 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
-  type ObservationAppender,
+  type ImportBatchWriter,
 } from '../src/local-service/server';
 
-const TEST_OBSERVATION_APPENDER: ObservationAppender = {
-  appendMany() {
+const TEST_IMPORT_WRITER: ImportBatchWriter = {
+  importBatch() {
     return { ids: [] };
   },
 };
@@ -59,7 +59,7 @@ describe('loopback-only local service', () => {
     expectTypeOf<Parameters<typeof startLocalService>>().toEqualTypeOf<
       [
         options: {
-          readonly observations: ObservationAppender;
+          readonly imports: ImportBatchWriter;
           readonly port: number;
         },
       ]
@@ -69,10 +69,10 @@ describe('loopback-only local service', () => {
   it('always binds the actual listener to IPv4 loopback and supports port 0', async () => {
     const service = await startLocalService({
       host: '0.0.0.0',
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     } as unknown as {
-      observations: ObservationAppender;
+      imports: ImportBatchWriter;
       port: number;
     });
 
@@ -91,7 +91,7 @@ describe('loopback-only local service', () => {
 
   it('serves the stable health contract without reflecting local or request data', async () => {
     const service = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
     const environmentSentinel = 'environment-secret-sentinel';
@@ -129,7 +129,7 @@ describe('loopback-only local service', () => {
 
   it('returns 404 for an unknown route without permissive CORS', async () => {
     const service = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
 
@@ -149,7 +149,7 @@ describe('loopback-only local service', () => {
 
   it('returns 405 and Allow: GET for an unsupported health method', async () => {
     const service = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
 
@@ -170,7 +170,7 @@ describe('loopback-only local service', () => {
 
   it('closes cleanly and releases its listener', async () => {
     const service = await startLocalService({
-      observations: TEST_OBSERVATION_APPENDER,
+      imports: TEST_IMPORT_WRITER,
       port: 0,
     });
 

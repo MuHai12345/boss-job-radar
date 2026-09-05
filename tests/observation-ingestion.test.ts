@@ -7,6 +7,8 @@ import {
   type LocalDatabase,
 } from '../src/local-service/database/database';
 import type { JobObservationInput } from '../src/local-service/database/observation-repository';
+import { ImportConflictError } from '../src/local-service/database/import-repository';
+import type { ImportRequest } from '../src/shared/import-request-types';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
@@ -49,20 +51,42 @@ function createObservation(
   };
 }
 
+function createImportRequest(
+  observations: JobObservationInput[] = [createObservation()],
+  overrides: Partial<ImportRequest> = {},
+): ImportRequest {
+  const sourceObservation = observations[0] ?? createObservation();
+  return {
+    clientImportId: '90c03eab-79c4-48b0-95c4-85066db664b8',
+    source: {
+      pageType: sourceObservation.pageType,
+      pageUrl: sourceObservation.sourcePageUrl,
+      capturedAt: sourceObservation.capturedAt,
+      matchedCardCount:
+        sourceObservation.pageType === 'search_results'
+          ? observations.length
+          : null,
+      warnings: ['synthetic_extraction_warning'],
+    },
+    observations,
+    ...overrides,
+  };
+}
+
 async function startTestService(
-  observations?: {
-    appendMany(inputs: readonly JobObservationInput[]): { ids: number[] };
+  imports?: {
+    importBatch(request: ImportRequest): { ids: number[] };
   },
 ): Promise<{ database?: LocalDatabase; service: LocalService }> {
   let database: LocalDatabase | undefined;
-  if (observations === undefined) {
+  if (imports === undefined) {
     database = openLocalDatabase({ path: ':memory:' });
     databases.push(database);
-    observations = database.observations;
+    imports = database.imports;
   }
 
   const service = await startLocalService({
-    observations,
+    imports,
     port: 0,
   });
   services.push(service);
@@ -169,7 +193,7 @@ describe('secured loopback observation ingestion', () => {
     const secondSession = await getSession(second.service);
 
     expect(firstSession).toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       token: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(secondSession.token).toMatch(/^[0-9a-f]{64}$/);
@@ -198,7 +222,7 @@ describe('secured loopback observation ingestion', () => {
     async (token) => {
       const { service } = await startTestService();
       const response = await sendLocalRequest({
-        body: JSON.stringify({ observations: [createObservation()] }),
+        body: JSON.stringify(createImportRequest()),
         headers: {
           ...JSON_HEADERS,
           ...(token === undefined
@@ -225,7 +249,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { origin },
       service,
       token,
@@ -238,7 +262,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { origin: 'chrome-extension://synthetic-extension-id' },
       service,
       token,
@@ -257,7 +281,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { origin },
       service,
       token,
@@ -270,7 +294,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: {
         forwarded: `host=127.0.0.1:${service.address.port}`,
         host: 'attacker.example',
@@ -305,7 +329,7 @@ describe('secured loopback observation ingestion', () => {
       setHost: false,
     });
     const postResponse = await sendLocalRequest({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: JSON_HEADERS,
       method: 'POST',
       path: '/observations',
@@ -345,7 +369,7 @@ describe('secured loopback observation ingestion', () => {
       const { service } = await startTestService();
       const { token } = await getSession(service);
       const response = await postObservations({
-        body: JSON.stringify({ observations: [createObservation()] }),
+        body: JSON.stringify(createImportRequest()),
         headers: { 'content-type': contentType },
         service,
         token,
@@ -359,7 +383,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await sendLocalRequest({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { 'x-boss-job-radar-token': token },
       method: 'POST',
       path: '/observations',
@@ -373,7 +397,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { 'content-type': 'application/json; charset=utf-8' },
       service,
       token,
@@ -386,7 +410,7 @@ describe('secured loopback observation ingestion', () => {
     const { service } = await startTestService();
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({ observations: [createObservation()] }),
+      body: JSON.stringify(createImportRequest()),
       headers: { 'content-encoding': 'gzip' },
       service,
       token,
@@ -435,38 +459,95 @@ describe('secured loopback observation ingestion', () => {
   });
 
   it.each([
-    ['empty batch', { observations: [] }],
+    [
+      'malformed client import UUID',
+      { ...createImportRequest(), clientImportId: 'not-a-uuid' },
+    ],
+    ['empty batch', createImportRequest([])],
     [
       'more than 100 observations',
-      { observations: Array.from({ length: 101 }, () => createObservation()) },
+      createImportRequest(Array.from({ length: 101 }, () => createObservation())),
     ],
     [
       'unsupported page type',
-      { observations: [createObservation({ pageType: 'unknown' as 'job_detail' })] },
+      createImportRequest([
+        createObservation({ pageType: 'unknown' as 'job_detail' }),
+      ]),
     ],
     [
       'wrong nullable field type',
-      { observations: [createObservation({ title: 42 as unknown as string })] },
+      createImportRequest([
+        createObservation({ title: 42 as unknown as string }),
+      ]),
     ],
     [
       'invalid string array',
-      { observations: [createObservation({ tags: ['ok', 42] as string[] })] },
+      createImportRequest([
+        createObservation({ tags: ['ok', 42] as string[] }),
+      ]),
     ],
     [
       'missing required field',
-      {
-        observations: [
+      createImportRequest([
           Object.fromEntries(
             Object.entries(createObservation()).filter(
               ([key]) => key !== 'capturedAt',
             ),
-          ),
-        ],
-      },
+          ) as JobObservationInput,
+      ]),
     ],
     [
       'unknown top-level key',
-      { observations: [createObservation()], protocolVersion: 1 },
+      { ...createImportRequest(), protocolVersion: 2 },
+    ],
+    [
+      'observation page type inconsistent with source',
+      createImportRequest(
+        [createObservation({ pageType: 'search_results' })],
+        {
+          source: {
+            pageType: 'job_detail',
+            pageUrl: 'https://example.invalid/source',
+            capturedAt: '2026-09-03T10:00:00.000Z',
+            matchedCardCount: null,
+            warnings: [],
+          },
+        },
+      ),
+    ],
+    [
+      'observation captured time inconsistent with source',
+      createImportRequest(
+        [createObservation({ capturedAt: '2026-09-03T11:00:00.000Z' })],
+        {
+          source: {
+            pageType: 'job_detail',
+            pageUrl: 'https://example.invalid/source',
+            capturedAt: '2026-09-03T10:00:00.000Z',
+            matchedCardCount: null,
+            warnings: [],
+          },
+        },
+      ),
+    ],
+    [
+      'observation source URL inconsistent with source',
+      createImportRequest(
+        [
+          createObservation({
+            sourcePageUrl: 'https://example.invalid/other',
+          }),
+        ],
+        {
+          source: {
+            pageType: 'job_detail',
+            pageUrl: 'https://example.invalid/source',
+            capturedAt: '2026-09-03T10:00:00.000Z',
+            matchedCardCount: null,
+            warnings: [],
+          },
+        },
+      ),
     ],
   ])('rejects invalid DTO shape: %s', async (_name, payload) => {
     const { service } = await startTestService();
@@ -481,12 +562,58 @@ describe('secured loopback observation ingestion', () => {
     expect(JSON.parse(response.body)).toEqual({ error: 'invalid_request' });
   });
 
+  it('returns the original IDs when the same import request is replayed', async () => {
+    const { database, service } = await startTestService();
+    const { token } = await getSession(service);
+    const request = createImportRequest();
+
+    const first = await postObservations({
+      body: JSON.stringify(request),
+      service,
+      token,
+    });
+    const replay = await postObservations({
+      body: JSON.stringify(request),
+      service,
+      token,
+    });
+
+    expect(first.statusCode).toBe(201);
+    expect(replay.statusCode).toBe(201);
+    expect(JSON.parse(replay.body)).toEqual(JSON.parse(first.body));
+    expect(database?.observations.getById(2)).toBeNull();
+  });
+
+  it('returns 409 for a persisted ID with changed payload and retains the original import', async () => {
+    const { database, service } = await startTestService();
+    const { token } = await getSession(service);
+    const envelope = createImportRequest();
+    const first = await postObservations({
+      body: JSON.stringify(envelope), service, token,
+    });
+    const conflict = await postObservations({
+      body: JSON.stringify({
+        ...envelope,
+        observations: [createObservation({ rawText: 'different secret payload' })],
+      }), service, token,
+    });
+    expect(first.statusCode).toBe(201);
+    expect(conflict.statusCode).toBe(409);
+    expect(JSON.parse(conflict.body)).toEqual({ error: 'import_conflict' });
+    const replay = await postObservations({
+      body: JSON.stringify(envelope), service, token,
+    });
+    expect(replay.statusCode).toBe(201);
+    expect(replay.body).toBe(first.body);
+    expect(database?.observations.getById(2)).toBeNull();
+  });
+
   it('appends a complete valid observation and returns only its id', async () => {
     const { database, service } = await startTestService();
     const { token } = await getSession(service);
     const observation = createObservation();
     const response = await postObservations({
-      body: JSON.stringify({ observations: [observation] }),
+      body: JSON.stringify(createImportRequest([observation])),
       service,
       token,
     });
@@ -500,6 +627,7 @@ describe('secured loopback observation ingestion', () => {
     expect(responseBody).toEqual({ ids: [expect.any(Number)] });
     expect(database?.observations.getById(responseBody.ids[0]!)).toEqual({
       id: responseBody.ids[0],
+      importRunId: expect.any(Number),
       jobId: expect.any(Number),
       ...observation,
     });
@@ -514,16 +642,26 @@ describe('secured loopback observation ingestion', () => {
     });
 
     const firstResponse = await postObservations({
-      body: JSON.stringify({ observations: [observation] }),
+      body: JSON.stringify(createImportRequest([observation])),
       service,
       token,
     });
     const secondResponse = await postObservations({
-      body: JSON.stringify({
-        observations: [
+      body: JSON.stringify(createImportRequest(
+        [
           { ...observation, capturedAt: '2026-09-03T11:00:00.000Z' },
         ],
-      }),
+        {
+          clientImportId: '241fca2e-525a-4dde-a82e-b2467465dedc',
+          source: {
+            pageType: 'job_detail',
+            pageUrl: observation.sourcePageUrl,
+            capturedAt: '2026-09-03T11:00:00.000Z',
+            matchedCardCount: null,
+            warnings: [],
+          },
+        },
+      )),
       service,
       token,
     });
@@ -550,7 +688,9 @@ describe('secured loopback observation ingestion', () => {
     const first = createObservation({ title: 'first synthetic' });
     const duplicate = createObservation({ title: 'duplicate synthetic' });
     const response = await postObservations({
-      body: JSON.stringify({ observations: [first, duplicate, duplicate] }),
+      body: JSON.stringify(
+        createImportRequest([first, duplicate, duplicate]),
+      ),
       service,
       token,
     });
@@ -569,15 +709,15 @@ describe('secured loopback observation ingestion', () => {
     const pathSentinel = 'C:\\synthetic-secret\\database.sqlite3';
     const payloadSentinel = 'synthetic-sensitive-payload';
     const { service } = await startTestService({
-      appendMany() {
+      importBatch() {
         throw new Error(`${sqlSentinel} at ${pathSentinel}`);
       },
     });
     const { token } = await getSession(service);
     const response = await postObservations({
-      body: JSON.stringify({
-        observations: [createObservation({ rawText: payloadSentinel })],
-      }),
+      body: JSON.stringify(
+        createImportRequest([createObservation({ rawText: payloadSentinel })]),
+      ),
       service,
       token,
     });
@@ -587,6 +727,30 @@ describe('secured loopback observation ingestion', () => {
     expect(response.body).not.toContain(sqlSentinel);
     expect(response.body).not.toContain(pathSentinel);
     expect(response.body).not.toContain(payloadSentinel);
+    expect(response.body).not.toContain(token);
+  });
+
+  it('returns a stable 409 without leaking conflicting import data', async () => {
+    const conflictSentinel = 'different-payload-secret';
+    const { service } = await startTestService({
+      importBatch() {
+        throw new ImportConflictError();
+      },
+    });
+    const { token } = await getSession(service);
+    const response = await postObservations({
+      body: JSON.stringify(
+        createImportRequest([
+          createObservation({ rawText: conflictSentinel }),
+        ]),
+      ),
+      service,
+      token,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body)).toEqual({ error: 'import_conflict' });
+    expect(response.body).not.toContain(conflictSentinel);
     expect(response.body).not.toContain(token);
   });
 
