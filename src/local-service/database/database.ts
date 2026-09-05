@@ -1,4 +1,6 @@
 import SqliteDatabase from 'better-sqlite3';
+import { createJobLinkCheckRepository, type JobLinkCheckRepository } from './job-link-check-repository.js';
+import { createJobStatusAssessmentRepository, type JobStatusAssessmentRepository } from './job-status-assessment-repository.js';
 import { createSalaryDecodingRepository, type SalaryDecodingRepository } from './salary-decoding-repository.js';
 import { createDeterministicAnalysisRepository, type DeterministicAnalysisRepository } from './deterministic-analysis-repository.js';
 
@@ -17,6 +19,8 @@ import {
 } from './import-repository.js';
 
 export interface LocalDatabase {
+  readonly linkChecks: JobLinkCheckRepository;
+  readonly statusAssessments: JobStatusAssessmentRepository;
   readonly salaryDecoding: SalaryDecodingRepository;
   readonly analyses: DeterministicAnalysisRepository;
   readonly jobs: JobRepository;
@@ -35,6 +39,8 @@ export function openLocalDatabase(options: {
   let observations: JobObservationRepository;
   let analyses: DeterministicAnalysisRepository;
   let salaryDecoding: SalaryDecodingRepository;
+  let linkChecks: JobLinkCheckRepository;
+  let statusAssessments: JobStatusAssessmentRepository;
 
   try {
     database.pragma('foreign_keys = ON');
@@ -44,6 +50,8 @@ export function openLocalDatabase(options: {
     imports = createImportRepository(database, observations);
     analyses = createDeterministicAnalysisRepository(database);
     salaryDecoding = createSalaryDecodingRepository(database);
+    linkChecks = createJobLinkCheckRepository(database);
+    statusAssessments = createJobStatusAssessmentRepository(database);
   } catch (error) {
     database.close();
     throw error;
@@ -51,6 +59,8 @@ export function openLocalDatabase(options: {
 
   let closed = false;
   return {
+    linkChecks,
+    statusAssessments,
     salaryDecoding,
     analyses,
     jobs,

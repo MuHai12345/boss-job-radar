@@ -1,4 +1,5 @@
 import type { ImportRequest } from '../shared/import-request-types';
+import { validateJobLinkCheckRequest, type JobLinkCheckRequest } from '../shared/job-link-check-types';
 
 export const LOCAL_SERVICE_BASE_URL = 'http://127.0.0.1:32123';
 const REQUEST_TIMEOUT_MS = 5_000;
@@ -210,4 +211,37 @@ export async function saveImportRequestToLocalService(
   }
 
   return { ok: true, count: observationCount };
+}
+
+export type LocalServiceLinkCheckResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string };
+
+export async function saveJobLinkCheckToLocalService(
+  request: JobLinkCheckRequest,
+  fetchImplementation: typeof fetch = globalThis.fetch,
+): Promise<LocalServiceLinkCheckResult> {
+  const invalid = { ok: false, message: '本地服务未能保存岗位链接状态。' } as const;
+  const value = validateJobLinkCheckRequest(request);
+  if (value === null) return invalid;
+  try {
+    const sessionResponse = await fetchWithTimeout(fetchImplementation,
+      `${LOCAL_SERVICE_BASE_URL}/bridge/session`, { method: 'GET', cache: 'no-store', redirect: 'error', credentials: 'omit' });
+    const session = sessionResponse.body;
+    if (sessionResponse.status !== 200 || !isRecord(session) || Object.keys(session).length !== 2
+      || !Object.hasOwn(session, 'protocolVersion') || !Object.hasOwn(session, 'token')
+      || session.protocolVersion !== 2 || typeof session.token !== 'string' || !TOKEN_PATTERN.test(session.token)) return invalid;
+    // Fresh session per click. No retries: unlike imports this append has no replay key.
+    const response = await fetchWithTimeout(fetchImplementation, `${LOCAL_SERVICE_BASE_URL}/job-link-checks`, {
+      method: 'POST', redirect: 'error', credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', 'X-Boss-Job-Radar-Token': session.token },
+      body: JSON.stringify(value),
+    });
+    if (response.status === 404) return { ok: false, message: '该岗位尚未保存到本地。' };
+    if (response.status !== 201 || !isRecord(response.body) || Object.keys(response.body).length !== 1
+      || typeof response.body.id !== 'number' || !Number.isSafeInteger(response.body.id) || response.body.id <= 0) return invalid;
+    return { ok: true };
+  } catch {
+    return { ok: false, message: '本地服务未启动或无法连接。' };
+  }
 }

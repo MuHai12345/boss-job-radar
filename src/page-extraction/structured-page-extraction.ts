@@ -405,13 +405,21 @@ export function runVerifiedBossStructuredExtraction(
     };
   }
 
+  const detail = parseDetail(body, pageUrl);
+  const titleElement = profiles.detailProfile.title === null
+    ? null : body.querySelector(profiles.detailProfile.title);
+  const jdElement = body.querySelector(profiles.detailProfile.fullJd);
+  // A supported URL alone is not a structured job detail. Reuse only verified
+  // fields and visible-text handling; empty/loading/unavailable shells stay null.
+  const hasStructuredDetail = (titleElement !== null && visibleTagText(titleElement) !== null)
+    || (jdElement !== null && visibleTagText(jdElement) !== null && (detail.fullJdText?.trim() ?? '') !== '');
   return {
     pageType,
     pageUrl,
     capturedAt,
     matchedCardCount: null,
     cards: [],
-    detail: parseDetail(body, pageUrl),
+    detail: hasStructuredDetail ? detail : null,
     warnings: [],
   };
 }

@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import type { ImportRequest } from '../shared/import-request-types.js';
+import { validateJobLinkCheckRequest, type JobLinkCheckRequest } from '../shared/job-link-check-types.js';
 import { ImportConflictError } from './database/import-repository.js';
 import {
   createBridgeSessionToken,
@@ -21,6 +22,7 @@ export const LOCAL_SERVICE_HOST = '127.0.0.1' as const;
 const HEALTH_PATH = '/health';
 const BRIDGE_SESSION_PATH = '/bridge/session';
 const OBSERVATIONS_PATH = '/observations';
+const JOB_LINK_CHECKS_PATH = '/job-link-checks';
 const HEALTH_RESPONSE_BODY = JSON.stringify({
   status: 'ok',
   service: 'boss-job-radar-local',
@@ -39,6 +41,10 @@ export interface LocalService {
 
 export interface ImportBatchWriter {
   importBatch(request: ImportRequest): { ids: number[] };
+}
+
+export interface JobLinkCheckWriter {
+  append(request: JobLinkCheckRequest): { id: number } | null;
 }
 
 function sendJson(
@@ -77,11 +83,12 @@ function handleHealthRequest(
   response.end(HEALTH_RESPONSE_BODY);
 }
 
-async function handleObservationRequest(
+async function handleProtectedWriteRequest(
   request: IncomingMessage,
   response: ServerResponse,
   token: string,
   imports: ImportBatchWriter,
+  linkChecks: JobLinkCheckWriter | undefined,
 ): Promise<void> {
   if (!hasExpectedLoopbackHost(request)) {
     rejectWithoutReadingBody(request, response, 403, 'forbidden');
@@ -136,6 +143,23 @@ async function handleObservationRequest(
     return;
   }
 
+  if (request.url === JOB_LINK_CHECKS_PATH) {
+    const linkRequest = validateJobLinkCheckRequest(body);
+    if (linkRequest === null) {
+      sendJson(response, 400, { error: 'invalid_request' });
+      return;
+    }
+    try {
+      if (linkChecks === undefined) throw new Error('Link check storage unavailable.');
+      const result = linkChecks.append(linkRequest);
+      if (result === null) sendJson(response, 404, { error: 'job_not_found' });
+      else sendJson(response, 201, { id: result.id });
+    } catch {
+      sendJson(response, 500, { error: 'internal_error' });
+    }
+    return;
+  }
+
   const importRequest = validateImportRequest(body);
   if (importRequest === null) {
     sendJson(response, 400, { error: 'invalid_request' });
@@ -159,6 +183,7 @@ async function handleRequest(
   response: ServerResponse,
   token: string,
   imports: ImportBatchWriter,
+  linkChecks: JobLinkCheckWriter | undefined,
 ): Promise<void> {
   if (request.url === HEALTH_PATH) {
     handleHealthRequest(request, response);
@@ -183,12 +208,13 @@ async function handleRequest(
     return;
   }
 
-  if (request.url === OBSERVATIONS_PATH) {
-    await handleObservationRequest(
+  if (request.url === OBSERVATIONS_PATH || request.url === JOB_LINK_CHECKS_PATH) {
+    await handleProtectedWriteRequest(
       request,
       response,
       token,
       imports,
+      linkChecks,
     );
     return;
   }
@@ -199,6 +225,7 @@ async function handleRequest(
 
 export async function startLocalService(options: {
   readonly imports: ImportBatchWriter;
+  readonly linkChecks?: JobLinkCheckWriter;
   readonly port: number;
 }): Promise<LocalService> {
   const token = createBridgeSessionToken();
@@ -208,6 +235,7 @@ export async function startLocalService(options: {
       response,
       token,
       options.imports,
+      options.linkChecks,
     ).catch(() => {
       if (!response.headersSent) {
         sendJson(response, 500, { error: 'internal_error' });

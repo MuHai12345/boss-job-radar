@@ -4,6 +4,7 @@ import {
 } from './database/database.js';
 import { refreshAnalysisSafely } from './deterministic-analysis-refresh.js';
 import { refreshSalaryDecodingSafely } from './salary-decoding-refresh.js';
+import { refreshJobStatusSafely } from './job-status-refresh.js';
 import {
   startLocalService,
   type LocalService,
@@ -26,6 +27,7 @@ export async function startLocalRuntime(options: {
   try {
     service = await startLocalService({
       imports: database.imports,
+      linkChecks: database.linkChecks,
       port: options.port,
     });
   } catch (error) {
@@ -35,6 +37,7 @@ export async function startLocalRuntime(options: {
 
   refreshAnalysisSafely(() => database.analyses.refreshAll());
   refreshSalaryDecodingSafely(() => database.salaryDecoding.refreshAll());
+  refreshJobStatusSafely(() => database.statusAssessments.refreshAll());
 
   let closePromise: Promise<void> | undefined;
   return {

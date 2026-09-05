@@ -1,4 +1,7 @@
 import type SqliteDatabase from 'better-sqlite3';
+import { createJobLinkCheckRepository } from './job-link-check-repository.js';
+import { createJobStatusAssessmentRepository } from './job-status-assessment-repository.js';
+import { refreshJobStatusSafely } from '../job-status-refresh.js';
 
 import type { ImportRequest } from '../../shared/import-request-types.js';
 import type { JobObservationRepository } from './observation-repository.js';
@@ -142,6 +145,11 @@ export function createImportRepository(
       refreshSalaryDecodingSafely(() => {
         const jobIds = ids.map((id) => (database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number }).job_id);
         createSalaryDecodingRepository(database).refreshAffectedByJobs(jobIds);
+      });
+      refreshJobStatusSafely(() => createJobLinkCheckRepository(database).appendAvailableForObservations(ids));
+      refreshJobStatusSafely(() => {
+        const jobIds = ids.map((id) => (database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number }).job_id);
+        createJobStatusAssessmentRepository(database).refreshAffectedByJobs(jobIds);
       });
       return { ids };
     },

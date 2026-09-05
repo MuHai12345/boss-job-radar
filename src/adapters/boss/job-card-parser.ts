@@ -1,4 +1,5 @@
 import {
+  canonicalBossJobUrl,
   isAllowedBossUrl,
   isBossHostname,
   isSupportedHttpProtocol,
@@ -86,9 +87,7 @@ function normalizeVerifiedJobUrl(
     return { jobUrl: null, warnings: ['invalid_job_url'] };
   }
 
-  parsedUrl.search = '';
-  parsedUrl.hash = '';
-  return { jobUrl: parsedUrl.href, warnings: [] };
+  return { jobUrl: canonicalBossJobUrl(parsedUrl.href), warnings: [] };
 }
 
 function readText(card: Element, selector: string | null): string | null {

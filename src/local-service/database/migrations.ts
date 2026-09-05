@@ -356,9 +356,46 @@ const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    name: 'create_job_status_tracking',
+    up(database) {
+      database.exec(`
+        CREATE TABLE job_link_checks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          job_url TEXT NOT NULL,
+          observed_at TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('available', 'explicitly_unavailable', 'unknown')),
+          marker_code TEXT NULL CHECK (marker_code IN (
+            'job_closed', 'job_offline', 'job_expired', 'job_missing', 'job_deleted', 'recruitment_ended'
+          )),
+          source_observation_id INTEGER NULL UNIQUE REFERENCES job_observations(id),
+          created_at TEXT NOT NULL,
+          CHECK ((status = 'explicitly_unavailable') = (marker_code IS NOT NULL)),
+          CHECK (source_observation_id IS NULL OR status = 'available')
+        );
+        CREATE INDEX idx_job_link_checks_current
+        ON job_link_checks(job_id, observed_at DESC, id DESC);
+        CREATE TABLE job_status_assessments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          rules_version TEXT NOT NULL,
+          latest_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          recruiter_activity_observation_id INTEGER NULL REFERENCES job_observations(id),
+          published_observation_id INTEGER NULL REFERENCES job_observations(id),
+          latest_link_check_id INTEGER NULL REFERENCES job_link_checks(id),
+          source_state_key TEXT NOT NULL,
+          assessment_json TEXT NOT NULL,
+          assessed_at TEXT NOT NULL,
+          UNIQUE (job_id, rules_version, source_state_key)
+        );
+      `);
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 interface MaximumVersionRow {
   readonly version: number | null;

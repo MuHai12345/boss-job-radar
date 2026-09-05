@@ -17,3 +17,17 @@ export function isAllowedBossUrl(url: URL): boolean {
     isSupportedHttpProtocol(url.protocol) && isBossHostname(url.hostname)
   );
 }
+
+/** The verified parser's canonical detail identity; never retains query/hash. */
+export function canonicalBossJobUrl(input: string, baseUrl?: string): string | null {
+  try {
+    const url = new URL(input, baseUrl);
+    if (!isAllowedBossUrl(url) || url.username !== '' || url.password !== ''
+      || !/^\/job_detail\/[^/]+\.html$/.test(url.pathname)) return null;
+    url.search = '';
+    url.hash = '';
+    return url.href;
+  } catch {
+    return null;
+  }
+}
