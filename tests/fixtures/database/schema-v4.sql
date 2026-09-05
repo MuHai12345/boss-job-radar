@@ -131,5 +131,5 @@ INSERT INTO schema_migrations VALUES (1, 'create_job_observations', '2026-09-04'
 
         CREATE INDEX idx_job_observations_analysis_source
         ON job_observations(job_id, captured_at DESC, id DESC);
-      
+
 INSERT INTO schema_migrations VALUES (4, 'create_deterministic_job_analyses', '2026-09-05');

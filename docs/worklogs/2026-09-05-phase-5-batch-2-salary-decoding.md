@@ -57,3 +57,5 @@ git diff --check
 能力矩阵：8、9 依据外部 PASS 更新 VERIFIED；15 为 IMPLEMENTED_AWAITING_REVIEW；10–14 保持 NOT_STARTED。合计 9 VERIFIED、1 awaiting review、5 remaining。
 
 未发现待修复的本轮实现问题；最终验收由外部网页版 ChatGPT 决定。无全局映射、字体逆向、私有 API、LLM、薪资排序、招聘时效、自动浏览/投递或审核 UI。
+
+提交补记：implementation commit 为 `0be73b9`。staged diff 检查发现冻结 SQL fixture 的空白行仍有尾随空格；首次清理未去除 CRLF 行末前空格，implementation commit 已生成。随后单独提交纯格式修正及本条事实记录，保留有效提交历史，不 amend 或重写。最终 base→HEAD diff 检查结果见最终报告。
