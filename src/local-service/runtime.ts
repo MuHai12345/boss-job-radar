@@ -3,6 +3,7 @@ import {
   type LocalDatabase,
 } from './database/database.js';
 import { refreshAnalysisSafely } from './deterministic-analysis-refresh.js';
+import { refreshSalaryDecodingSafely } from './salary-decoding-refresh.js';
 import {
   startLocalService,
   type LocalService,
@@ -33,6 +34,7 @@ export async function startLocalRuntime(options: {
   }
 
   refreshAnalysisSafely(() => database.analyses.refreshAll());
+  refreshSalaryDecodingSafely(() => database.salaryDecoding.refreshAll());
 
   let closePromise: Promise<void> | undefined;
   return {

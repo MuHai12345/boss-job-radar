@@ -82,6 +82,7 @@ export function learnSalaryCharacterMapping(
   }
 
   const evidence: Record<string, string> = {};
+  let hasConflict = false;
   for (let index = 0; index < rawCharacters.length; index += 1) {
     const rawCharacter = rawCharacters[index] as string;
     const verifiedCharacter = verifiedCharacters[index] as string;
@@ -100,13 +101,8 @@ export function learnSalaryCharacterMapping(
       (currentState.characters[rawCharacter] !== undefined &&
         currentState.characters[rawCharacter] !== verifiedCharacter)
     ) {
-      return {
-        status: 'mapping_conflict',
-        state: {
-          status: 'conflicted',
-          characters: { ...currentState.characters },
-        },
-      };
+      // Finish structural validation before allowing evidence to poison a run.
+      hasConflict = true;
     }
     evidence[rawCharacter] = verifiedCharacter;
   }
@@ -114,6 +110,12 @@ export function learnSalaryCharacterMapping(
   const learnedCharacters = Object.keys(evidence);
   if (learnedCharacters.length === 0) {
     return rejected(currentState, 'no_private_use_character');
+  }
+  if (hasConflict) {
+    return {
+      status: 'mapping_conflict',
+      state: { status: 'conflicted', characters: { ...currentState.characters } },
+    };
   }
   return {
     status: 'learned',

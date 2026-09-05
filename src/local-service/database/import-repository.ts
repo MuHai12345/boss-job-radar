@@ -6,6 +6,8 @@ import { fingerprintImportRequest } from './import-fingerprint.js';
 import { validateImportRequest } from '../import-request-validation.js';
 import { createDeterministicAnalysisRepository } from './deterministic-analysis-repository.js';
 import { refreshAnalysisSafely } from '../deterministic-analysis-refresh.js';
+import { createSalaryDecodingRepository } from './salary-decoding-repository.js';
+import { refreshSalaryDecodingSafely } from '../salary-decoding-refresh.js';
 
 export class ImportConflictError extends Error {
   constructor() {
@@ -136,6 +138,10 @@ export function createImportRepository(
           try { analyses.analyzeJob(jobId); } catch { failed = true; }
         }
         if (failed) throw new Error('Deterministic analysis refresh failed.');
+      });
+      refreshSalaryDecodingSafely(() => {
+        const jobIds = ids.map((id) => (database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number }).job_id);
+        createSalaryDecodingRepository(database).refreshAffectedByJobs(jobIds);
       });
       return { ids };
     },

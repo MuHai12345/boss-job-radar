@@ -2,10 +2,10 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 5 / Batch 1`
-- 下一步骤：`Phase 5 / Batch 1 external review`
+- 当前阶段：`Phase 5 / Batch 2`
+- 下一步骤：`Phase 5 / Batch 2 external review`
 - 当前状态：`Phase 5 - IN PROGRESS / NOT YET PASSED`
-- 已通过的最后 implementation commit：`148f244a0501017a147889be3f31615f9e6b5c60`
+- 已通过的最后 implementation commit：`7f7ff619ca03c1855a2fdd0d1fa88731207d1328`
 - Phase 0：`PASS`
 - Phase 1：`PASS`
 - Phase 1 / Batch 1：`PASS`
@@ -46,11 +46,12 @@
 - Phase 4 / Batch 4：`PASS`
 - Phase 4 / Batch 5：`PASS`
 - Phase 5：`IN PROGRESS / NOT YET PASSED`
-- Phase 5 / Batch 1：`implementation_complete_awaiting_external_review`
-- 核心能力矩阵：7 / 15 VERIFIED；2 项 IMPLEMENTED_AWAITING_REVIEW；6 项 NOT_STARTED
+- Phase 5 / Batch 1：`PASS`（依据本轮外部 Prompt）
+- Phase 5 / Batch 2：`implementation_complete_awaiting_external_review`
+- 核心能力矩阵：9 / 15 VERIFIED；1 项 IMPLEMENTED_AWAITING_REVIEW；5 项 NOT_STARTED
 - Phase 3 implementation lineage：`b73dc43869764f4bbd4d9de6e22d75acc0baed5f` → `b667eaa222bc065f1faff254e7a2d4c640fbf86d` → `05e5b3e6441499a213544b6b6961ecefa765afac`
-- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 5 / Batch 1
-- 权限边界：Codex 无权自行宣布 Phase 5 / Batch 1 `PASS` 或开始下一批
+- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 5 / Batch 2
+- 权限边界：Codex 无权自行宣布 Phase 5 / Batch 2 `PASS` 或开始下一批
 - 仍未实现：
   - final Job aggregation
   - observation dedupe（按设计不实现）
@@ -63,12 +64,12 @@
 
 这里的当前状态只表示：
 
-> 依据本轮外部 Prompt，Phase 0–4 均已获外部 `PASS`，Phase 4 / Batch 1–5 全部 `PASS`。Phase 5 / Batch 1 的确定性岗位性质与经验要求分析已完成实现，等待外部审阅；Phase 5 为 `IN PROGRESS / NOT YET PASSED`。developer verification 不等于 external acceptance。
+> 依据本轮外部 Prompt，Phase 0–4 均已获外部 `PASS`，Phase 4 / Batch 1–5 全部 `PASS`。Phase 5 / Batch 1 已正式外部 PASS；Phase 5 / Batch 2 的 SearchRun 范围薪资解码已实现，等待外部审阅；Phase 5 为 `IN PROGRESS / NOT YET PASSED`。developer verification 不等于 external acceptance。
 
 该结论不表示：
 
 - verified selector 是 BOSS 官方或永久稳定的 contract；
-- Phase 5 / Batch 1 已通过外部验收；
+- Phase 5 / Batch 2 已通过外部验收；
 - observation dedupe、AI 或 Dashboard 已实现。
 
 Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
@@ -83,7 +84,7 @@ popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM S
 
 用户已报告 BOSS 首页、搜索结果页和详情页的人工 probe 均成功，并已完成搜索页和多个详情页的 Targeted Probe。外部网页版 ChatGPT 已从匿名样本确认字段级 selector；本轮将它们与 synthetic profiles 明确分离并通过脱敏 real-shape fixtures 接入纯 parser。
 
-列表 parser 继续忠实保留原始薪资 DOM 文本，不自动解码 PUA。独立 salary mapping core 只根据调用方提供的列表原文和已验证详情薪资学习当前内存映射；结构不一致、非数字映射、映射不完整或冲突均返回明确状态，不猜测薪资，也不持久化映射。
+列表 parser 继续忠实保留原始薪资 DOM 文本，不自动解码 PUA。salary mapping core 根据列表原文和已验证详情薪资学习字符映射；Batch 2 在 local service 中加入 SearchRun 范围的持久化派生层。结构不一致、非数字映射、映射不完整或冲突均返回明确状态，不猜测薪资。
 
 verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
 
@@ -106,3 +107,12 @@ Phase 4 / Batch 5 将 schema 升至 version 3、bridge protocol 升至 version 2
 - ImportRun 源数据 commit 后再独立分析受影响 Jobs；HTTP listener 启动后 backfill 已有 Jobs。异常只记录固定 generic diagnostic，不撤销采集、不阻止服务或保存，可随后补齐。
 - 详细阈值、读取 contract 与限制见 [ADR-0012](decisions/ADR-0012-deterministic-job-analysis-v1.md)；开发命令和结果见 [本批工作日志](worklogs/2026-09-05-phase-5-batch-1-deterministic-analysis.md)。
 - 状态为 `implementation_complete_awaiting_external_review`；不开始下一批。
+
+## Phase 5 / Batch 2 实现状态
+
+- schema version 5；规则 `search-run-salary-mapping-v1`。三张新表仅存派生 mapping、evidence provenance 和 decoding history，不更新原始薪资、parser 或 Job identity。
+- 同 canonical Job、明确 SearchRun provenance、detail 明文、向后 24h 闭区间；最近时间优先、同时间高 ID 优先。core 完整验证结构后才判 mapping conflict。
+- 映射独立于每个 SearchRun，revision 从 0 开始；新字符和首次 conflict 增加 revision；重复 evidence 不增加。候选被后来导入的更近详情替换时从当前候选集合重建，状态变化追加 revision，保留旧历史；已 conflicted 不恢复。
+- plain salary 直接保留明文；PUA 仅在完整 verified mapping 时输出；incomplete / conflict 的 decodedText 为 null；nullable 原始薪资不创建结果。
+- 导入事实和确定性分析阶段之后独立刷新，HTTP listener 启动后补旧数据。逐 Run 事务隔离；失败只输出 `Salary decoding refresh failed.`，不能 rollback 源事实或分析。
+- 本轮 developer verification 见 [工作日志](worklogs/2026-09-05-phase-5-batch-2-salary-decoding.md)，不等于 external acceptance。当前状态为等待外部审阅，不进入下一批。

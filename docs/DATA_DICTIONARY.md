@@ -131,4 +131,18 @@ Evidence 为 `code/source/section/excerpt`，excerpt 是最多 160 chars 的原�
 
 ## 当前边界
 
-当前实现 Job identity/lifecycle、observation linking、ImportRun、SearchRun provenance、幂等导入，以及独立确定性岗位性质和经验分析；不实现 observation dedupe、最终 aggregate facts、其余分析维度、用户审核状态或自动 merge/reconciliation。Phase 4 已获外部 PASS；Phase 5 / Batch 1 实现等待外部审阅。
+当前实现 Job identity/lifecycle、observation linking、ImportRun、SearchRun provenance、幂等导入，以及独立确定性岗位性质和经验分析；不实现 observation dedupe、最终 aggregate facts、其余分析维度、用户审核状态或自动 merge/reconciliation。Phase 4 已获外部 PASS；Phase 5 / Batch 1 已获外部 PASS；Batch 2 薪资解码实现等待外部审阅。
+
+## SearchRun salary derived data（schema version 5）
+
+`JobObservation.salaryText` 始终是原始事实，不 UPDATE、去 PUA 或 normalize。详情只提供 evidence，不生成 SearchRun decoding；无 SearchRun provenance 的列表观察不解码，NULL salary 不创建结果。
+
+| 表 | 列与含义 |
+| --- | --- |
+| `search_run_salary_mappings` | `search_run_id` 主键/FK；`rules_version` 固定为 `search-run-salary-mapping-v1`；`status` active/conflicted；`characters_json` PUA→ASCII digit 对象；`revision` 从 0 开始；`evidence_count` 累计记录的 evidence 数（含 rejected 和被替换候选）；`selected_evidence_json` 当前选择的 searchObservationId:detailObservationId 键列表；`updated_at` 派生更新时间 |
+| `salary_mapping_evidence` | `id`；`search_run_id`、`search_observation_id`、`detail_observation_id`、`job_id` 外键；`result` learned/rejected/mapping_conflict/state_conflicted；`rejection_reason` nullable core rejection reason；`created_at`；唯一键 (search_run_id, search_observation_id, detail_observation_id) |
+| `salary_decoding_results` | `id`；`observation_id`、`search_run_id` 外键；`mapping_revision`；`status` plain_text/verified_mapping/incomplete_mapping/mapping_conflict/invalid_input；`decoded_text` nullable；`unresolved_characters_json` 未知 PUA 字符数组（包含补充平面）；`created_at`；唯一键 (observation_id, mapping_revision) |
+
+新 revision 追加解码结果，不更新历史。只读当前结果时 join 当前 SearchRun mapping revision；缺当前记录返回 null，不回退旧 revision。mapping revision 对新增字符或首次进入冲突递增，重复或未新增字符的 evidence 不递增。若较近或同时间较高 ID 的详情在后续才保存，替换候选并重建当前有效证据集合，实际状态变化另追加 revision 以失效旧解码；旧 evidence/results 不删除。conflicted 状态保持关闭。
+
+证据时间采用 observation capturedAt，允许 0 到 24h（含端点），与启动时钟无关。映射与解码不含原始 salary 副本，原文通过两个 observation IDs 追溯。各 Run 在独立事务内写入 mapping/evidence/results，任一派生写入失败该 Run 整体回滚，其他 Runs 可继续；已提交的事实和确定性分析不受影响。migration 只建结构，backfill 在服务启动后的 repository refresh 执行。

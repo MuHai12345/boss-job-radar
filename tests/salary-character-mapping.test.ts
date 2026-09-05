@@ -12,6 +12,14 @@ const puaC = '\u{F0103}';
 const puaD = '\u{100104}';
 
 describe('salary character mapping', () => {
+  it.each([false, true])('validates the entire structure before reporting a conflict (existing=%s)', (existing) => {
+    const state = existing
+      ? learnSalaryCharacterMapping(createEmptySalaryCharacterMapping(), `${puaA}K`, '6K').state
+      : createEmptySalaryCharacterMapping();
+    const result = learnSalaryCharacterMapping(state, `${puaA}-${puaA}K`, '8-9M');
+    expect(result).toMatchObject({ status: 'rejected', reason: 'non_pua_mismatch', state });
+    expect(state.status).toBe('active');
+  });
   it('returns plain text unchanged when no PUA character exists', () => {
     expect(
       decodeSalaryWithMapping('6-9K', createEmptySalaryCharacterMapping()),

@@ -131,7 +131,7 @@ describe('analysis source and persistence', () => {
     const imports = db.prepare('SELECT * FROM import_runs').all();
     const searches = db.prepare('SELECT * FROM search_runs').all();
     runMigrations(db);
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()).toEqual({ version: 4 });
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()).toEqual({ version: 5 });
     expect(db.prepare('SELECT * FROM deterministic_job_analyses').all()).toEqual([]);
     analyses.refreshAll();
     expect(analyses.getLatestForJob(1)).not.toBeNull();

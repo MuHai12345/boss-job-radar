@@ -309,9 +309,56 @@ const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    name: 'create_search_run_salary_decoding',
+    up(database) {
+      database.exec(`
+        CREATE TABLE search_run_salary_mappings (
+          search_run_id INTEGER PRIMARY KEY REFERENCES search_runs(id),
+          rules_version TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('active', 'conflicted')),
+          characters_json TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision >= 0),
+          evidence_count INTEGER NOT NULL CHECK (evidence_count >= 0),
+          selected_evidence_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE salary_mapping_evidence (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          search_run_id INTEGER NOT NULL REFERENCES search_runs(id),
+          search_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          detail_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          result TEXT NOT NULL CHECK (result IN ('learned', 'rejected', 'mapping_conflict', 'state_conflicted')),
+          rejection_reason TEXT NULL CHECK (rejection_reason IN (
+            'invalid_input', 'no_private_use_character', 'unaligned_structure',
+            'non_pua_mismatch', 'pua_not_aligned_to_digit'
+          )),
+          created_at TEXT NOT NULL,
+          CHECK ((result = 'rejected') = (rejection_reason IS NOT NULL)),
+          UNIQUE (search_run_id, search_observation_id, detail_observation_id)
+        );
+        CREATE TABLE salary_decoding_results (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          search_run_id INTEGER NOT NULL REFERENCES search_run_salary_mappings(search_run_id),
+          mapping_revision INTEGER NOT NULL CHECK (mapping_revision >= 0),
+          status TEXT NOT NULL CHECK (status IN (
+            'plain_text', 'verified_mapping', 'incomplete_mapping', 'mapping_conflict', 'invalid_input'
+          )),
+          decoded_text TEXT NULL,
+          unresolved_characters_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          CHECK ((status IN ('plain_text', 'verified_mapping')) = (decoded_text IS NOT NULL)),
+          UNIQUE (observation_id, mapping_revision)
+        );
+      `);
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 interface MaximumVersionRow {
   readonly version: number | null;

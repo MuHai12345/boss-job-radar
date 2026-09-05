@@ -1,4 +1,5 @@
 import SqliteDatabase from 'better-sqlite3';
+import { createSalaryDecodingRepository, type SalaryDecodingRepository } from './salary-decoding-repository.js';
 import { createDeterministicAnalysisRepository, type DeterministicAnalysisRepository } from './deterministic-analysis-repository.js';
 
 import { runMigrations } from './migrations.js';
@@ -16,6 +17,7 @@ import {
 } from './import-repository.js';
 
 export interface LocalDatabase {
+  readonly salaryDecoding: SalaryDecodingRepository;
   readonly analyses: DeterministicAnalysisRepository;
   readonly jobs: JobRepository;
   readonly imports: ImportRepository;
@@ -32,6 +34,7 @@ export function openLocalDatabase(options: {
   let imports: ImportRepository;
   let observations: JobObservationRepository;
   let analyses: DeterministicAnalysisRepository;
+  let salaryDecoding: SalaryDecodingRepository;
 
   try {
     database.pragma('foreign_keys = ON');
@@ -40,6 +43,7 @@ export function openLocalDatabase(options: {
     observations = createJobObservationRepository(database);
     imports = createImportRepository(database, observations);
     analyses = createDeterministicAnalysisRepository(database);
+    salaryDecoding = createSalaryDecodingRepository(database);
   } catch (error) {
     database.close();
     throw error;
@@ -47,6 +51,7 @@ export function openLocalDatabase(options: {
 
   let closed = false;
   return {
+    salaryDecoding,
     analyses,
     jobs,
     imports,

@@ -6,9 +6,9 @@ GitHub 仓库：<https://github.com/MuHai12345/boss-job-radar>
 
 ## 当前阶段
 
-**依据本轮外部 Prompt，Phase 0–4 及 Phase 4 / Batch 1–5 均已获外部 `PASS`。Phase 5 为 `IN PROGRESS / NOT YET PASSED`；Phase 5 / Batch 1 为 `implementation_complete_awaiting_external_review`。**
+**依据本轮外部 Prompt，Phase 0–4 及 Phase 4 / Batch 1–5 均已获外部 `PASS`。Phase 5 为 `IN PROGRESS / NOT YET PASSED`；Phase 5 / Batch 1 已获外部 `PASS`；Phase 5 / Batch 2 为 `implementation_complete_awaiting_external_review`。**
 
-当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，以及已通过外部验收的 Job identity、ImportRun、SearchRun provenance 和幂等请求重放。本批新增确定性岗位性质与经验要求分析，等待外部审阅；未接入 LLM 和 Dashboard。
+当前已有能力包括 loopback-only local service、SQLite migration/storage foundation、append-only observation persistence/recovery、production database path 与统一 local runtime lifecycle、受保护 observation ingestion HTTP protocol、由用户明确点击触发的 extension → localhost save bridge，以及已通过外部验收的 Job identity、ImportRun、SearchRun provenance 和幂等请求重放。确定性岗位性质与经验要求分析已获外部 PASS；本批新增 SearchRun 范围薪资 PUA 可信解码，等待外部审阅；未接入 LLM 和 Dashboard。
 
 当前仓库同时包含通用人工 DOM Probe，以及只分析用户已经人工确认岗位区域的 Targeted DOM Structure Probe。两者都由用户主动触发，只用于帮助后续人工识别真实页面结构，不是正式岗位采集功能。
 
@@ -35,6 +35,10 @@ schema version 3 在既有 Job linking 基础上新增 `import_runs`、`search_r
 schema version 4 新增独立 `deterministic_job_analyses`。规则版本为 `deterministic-job-analysis-v1`：保存岗位性质、真实经验硬门槛/软偏好/无要求及 header/JD 矛盾，附原文短 evidence 和来源 observation IDs。最新 title/header/tags 来自 Job latest observation；完整 JD 从全部历史观察中选择最近非空一条，因此新的搜索列表不会抹掉旧详情证据。没有 JD 时两轴最终结果均保留 insufficient_evidence。
 
 每次 ImportRun 源事实 commit 后自动分析受影响 Jobs；local HTTP listener 启动后补齐已有 Jobs。分析失败不 rollback 采集，不阻止启动或保存，仅输出固定 generic diagnostic。`LocalDatabase.analyses` 提供 `analyzeJob`、`getLatestForJob`、`refreshAll`；同 latest/rules 键幂等，新键追加历史，当前分析尚未生成返回 null，stored JSON 读取需 runtime validate。当前没有分析 HTTP endpoint 或审核 UI。阈值和边界见 [ADR-0012](docs/decisions/ADR-0012-deterministic-job-analysis-v1.md)。
+
+schema version 5 新增 SearchRun 独立 salary mapping、证据和解码历史。原始 `JobObservation.salaryText` 永久保留；只用同一 canonical Job、搜索观察之后 24 小时内保存的明文详情作为候选，选时间最近的一条，同时间选 observation ID 最大的一条，再由现有 core 校验结构。映射不跨 SearchRun；冲突时该 Run 全部 PUA 解码失效，未知字符不输出部分解码。
+
+`LocalDatabase.salaryDecoding` 提供 `refreshSearchRun`、`refreshAffectedByJobs`、`refreshAll`、`getCurrentForObservation`、`getMappingForSearchRun`。导入事实与确定性分析提交后独立刷新；服务启动后回填旧 SearchRuns。派生失败不撤销事实、分析或 HTTP 保存，只记录固定通用诊断。新 revision 追加结果，旧历史保留，当前 revision 缺结果返回 null。无字体逆向、全局映射、薪资排名或新增 UI，规则见 [ADR-0013](docs/decisions/ADR-0013-search-run-salary-decoding.md)。
 
 ## 文档入口
 
@@ -90,4 +94,4 @@ npm run verify:manifests
 - 当前 extension host permission 仅为 `http://127.0.0.1:32123/*`；没有其他 localhost 范围、`<all_urls>`、自动采集、AI 或 Dashboard。
 - 最终查看和投递决定由用户本人完成。
 
-Phase 4 及其全部批次已通过外部验收；Phase 5 为 `IN PROGRESS / NOT YET PASSED`，Phase 5 / Batch 1 实现完成，等待外部网页版 ChatGPT 独立审阅。
+Phase 4 及其全部批次已通过外部验收；Phase 5 为 `IN PROGRESS / NOT YET PASSED`，Phase 5 / Batch 1 已获外部 PASS；Phase 5 / Batch 2 实现完成，等待外部网页版 ChatGPT 独立审阅。
