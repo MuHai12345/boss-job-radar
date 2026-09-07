@@ -72,7 +72,7 @@ describe('job opportunity schema v7', () => {
   it('creates the append-only opportunity table with constrained indexed fields', () => {
     const { database } = setup();
     try {
-      expect(CURRENT_SCHEMA_VERSION).toBe(7);
+      expect(CURRENT_SCHEMA_VERSION).toBe(8);
       const columns = database.prepare("PRAGMA table_info('job_opportunity_assessments')").all() as Array<{ name: string }>;
       expect(columns.map((column) => column.name)).toEqual([
         'id', 'job_id', 'rules_version', 'latest_observation_id', 'jd_observation_id',
