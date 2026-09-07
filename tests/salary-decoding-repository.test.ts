@@ -128,7 +128,7 @@ describe('SearchRun salary persistence', () => {
     expect(salary.getCurrentForObservation(search.ids[0]!)?.decodedText).toBe('8K');
     expect(db.prepare('SELECT detail_observation_id FROM salary_mapping_evidence').all()).toEqual([{ detail_observation_id: chosen.id }]);
   });
-  it('uses schema version seven', () => { expect(CURRENT_SCHEMA_VERSION).toBe(7); });
+  it('uses schema version eight', () => { expect(CURRENT_SCHEMA_VERSION).toBe(8); });
   it('does not increase revision for a second evidence that adds no characters', () => {
     const { imports, salary } = setup();
     imports.importBatch(salaryRequest([`${x}K`, `${x}K`]));
