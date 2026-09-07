@@ -69,6 +69,7 @@ describe('local SQLite database', () => {
         { name: 'create_search_run_salary_decoding', version: 5 },
         { name: 'create_job_status_tracking', version: 6 },
         { name: 'create_job_opportunity_assessments', version: 7 },
+        { name: 'create_structured_llm_analyses', version: 8 },
       ]);
       expect(observationTable).toEqual({ name: 'job_observations' });
       expect(
@@ -99,6 +100,13 @@ describe('local SQLite database', () => {
           )
           .get(),
       ).toEqual({ name: 'job_opportunity_assessments' });
+      expect(
+        inspectionConnection
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'structured_llm_analyses'",
+          )
+          .get(),
+      ).toEqual({ name: 'structured_llm_analyses' });
     } finally {
       inspectionConnection.close();
     }
