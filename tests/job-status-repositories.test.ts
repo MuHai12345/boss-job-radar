@@ -34,6 +34,7 @@ describe('job link checks and persisted status assessments', () => {
     const database = openLocalDatabase({ path: ':memory:' });
     try {
       const saved = database.observations.append(observation());
+      const jobId = database.observations.getById(saved.id)!.jobId;
       const checked = database.linkChecks.append({
         jobUrl: JOB_URL,
         observedAt: '2026-09-07T09:00:00.000Z',
@@ -42,7 +43,7 @@ describe('job link checks and persisted status assessments', () => {
       });
 
       expect(checked?.id).toBeGreaterThan(0);
-      expect(database.statusAssessments.getLatestForJob(saved.jobId, '2026-09-07T10:00:00.000Z')).toMatchObject({
+      expect(database.statusAssessments.getLatestForJob(jobId, '2026-09-07T10:00:00.000Z')).toMatchObject({
         latestLinkCheckId: checked?.id,
         link: {
           status: 'available',
@@ -59,6 +60,7 @@ describe('job link checks and persisted status assessments', () => {
     const database = openLocalDatabase({ path: ':memory:' });
     try {
       const saved = database.observations.append(observation());
+      const jobId = database.observations.getById(saved.id)!.jobId;
       const unavailable = database.linkChecks.append({
         jobUrl: JOB_URL,
         observedAt: '2026-09-07T09:00:00.000Z',
@@ -72,13 +74,11 @@ describe('job link checks and persisted status assessments', () => {
         markerCode: null,
       });
 
-      expect(database.statusAssessments.getLatestForJob(saved.jobId, '2026-09-07T10:30:00.000Z')).toMatchObject({
+      expect(database.statusAssessments.getLatestForJob(jobId, '2026-09-07T10:30:00.000Z')).toMatchObject({
         latestLinkCheckId: available?.id,
         link: { status: 'available', markerCode: null },
       });
-      expect(
-        database.observations.getById(saved.id)?.jobId,
-      ).toBe(saved.jobId);
+      expect(database.observations.getById(saved.id)?.jobId).toBe(jobId);
       expect(unavailable?.id).not.toBe(available?.id);
     } finally {
       database.close();
@@ -89,6 +89,7 @@ describe('job link checks and persisted status assessments', () => {
     const database = openLocalDatabase({ path: ':memory:' });
     try {
       const saved = database.observations.append(observation());
+      const jobId = database.observations.getById(saved.id)!.jobId;
       database.linkChecks.append({
         jobUrl: JOB_URL,
         observedAt: '2026-09-07T09:00:00.000Z',
@@ -102,7 +103,7 @@ describe('job link checks and persisted status assessments', () => {
         markerCode: null,
       });
 
-      expect(database.statusAssessments.getLatestForJob(saved.jobId, '2026-09-07T09:30:00.000Z')).toMatchObject({
+      expect(database.statusAssessments.getLatestForJob(jobId, '2026-09-07T09:30:00.000Z')).toMatchObject({
         latestLinkCheckId: laterId?.id,
         link: { status: 'available' },
       });
@@ -133,14 +134,16 @@ describe('job link checks and persisted status assessments', () => {
         recruiterActivityText: '今日活跃',
         publishedText: '2天前发布',
       }));
+      const olderRecord = database.observations.getById(older.id)!;
       const latest = database.observations.append(observation({
         capturedAt: '2026-09-07T08:00:00.000Z',
         recruiterActivityText: '   ',
         publishedText: '',
       }));
+      const latestRecord = database.observations.getById(latest.id)!;
 
-      expect(older.jobId).toBe(latest.jobId);
-      expect(database.statusAssessments.getLatestForJob(latest.jobId, '2026-09-07T10:00:00.000Z')).toMatchObject({
+      expect(olderRecord.jobId).toBe(latestRecord.jobId);
+      expect(database.statusAssessments.getLatestForJob(latestRecord.jobId, '2026-09-07T10:00:00.000Z')).toMatchObject({
         latestObservationId: latest.id,
         recruiterActivityObservationId: older.id,
         publishedObservationId: older.id,
@@ -172,13 +175,14 @@ describe('job link checks and persisted status assessments', () => {
       const saved = database.observations.append(observation({
         capturedAt: '2026-09-01T00:00:00.000Z',
       }));
+      const jobId = database.observations.getById(saved.id)!.jobId;
 
-      const first = database.statusAssessments.assessJob(saved.jobId, '2026-09-01T12:00:00.000Z');
+      const first = database.statusAssessments.assessJob(jobId, '2026-09-01T12:00:00.000Z');
       expect(first?.localObservation.recencyBand).toBe('today');
 
-      const second = database.statusAssessments.getLatestForJob(saved.jobId, '2026-09-03T00:00:00.000Z');
+      const second = database.statusAssessments.getLatestForJob(jobId, '2026-09-03T00:00:00.000Z');
       expect(second?.localObservation.recencyBand).toBe('within_3_days');
-      const repeated = database.statusAssessments.getLatestForJob(saved.jobId, '2026-09-03T12:00:00.000Z');
+      const repeated = database.statusAssessments.getLatestForJob(jobId, '2026-09-03T12:00:00.000Z');
       expect(repeated?.localObservation.recencyBand).toBe('within_3_days');
     } finally {
       database.close();
