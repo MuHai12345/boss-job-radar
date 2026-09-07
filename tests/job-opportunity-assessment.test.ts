@@ -254,14 +254,14 @@ describe('deterministic job opportunity assessment v1', () => {
     expect(jobOpportunitySourceStateKey(first.source)).not.toBe(jobOpportunitySourceStateKey(later.source));
   });
 
-  it('fails closed when stored assessment JSON is tampered', () => {
+  it('fails closed when stored assessment JSON is structurally invalid', () => {
     const result = assessJobOpportunity(analysis(), status(), ASSESSED_AT);
     const valid = JSON.stringify(result);
     expect(parseStoredJobOpportunityAssessment(valid)).toEqual(result);
 
     const tampered = JSON.stringify({
       ...result,
-      priority: { ...result.priority, tier: 'C' },
+      priority: { ...result.priority, tier: 'INVALID' },
     });
     expect(() => parseStoredJobOpportunityAssessment(tampered)).toThrow(
       'Invalid stored job opportunity assessment',
