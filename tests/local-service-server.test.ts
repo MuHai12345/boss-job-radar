@@ -6,6 +6,7 @@ import {
   LOCAL_SERVICE_HOST,
   startLocalService,
   type ImportBatchWriter,
+  type JobLinkCheckWriter,
 } from '../src/local-service/server';
 
 const TEST_IMPORT_WRITER: ImportBatchWriter = {
@@ -55,11 +56,12 @@ function sendLocalRequest(
 }
 
 describe('loopback-only local service', () => {
-  it('exposes a start API with only the port and narrow ingestion dependency', () => {
+  it('exposes a start API with the port and narrow write dependencies', () => {
     expectTypeOf<Parameters<typeof startLocalService>>().toEqualTypeOf<
       [
         options: {
           readonly imports: ImportBatchWriter;
+          readonly linkChecks?: JobLinkCheckWriter;
           readonly port: number;
         },
       ]
