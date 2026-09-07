@@ -318,12 +318,13 @@ describe('OpenAI Responses fail-closed behavior', () => {
       return new Promise<Response>(() => undefined);
     };
     const pending = provider(fetchImpl).generate(REQUEST);
+    const rejected = expect(pending).rejects.toThrow('Structured LLM provider failed');
     expect(OPENAI_STRUCTURED_LLM_TIMEOUT_MS).toBe(45_000);
     expect(calls).toBe(1);
     expect(signal?.aborted).toBe(false);
 
     await vi.advanceTimersByTimeAsync(OPENAI_STRUCTURED_LLM_TIMEOUT_MS);
-    await expect(pending).rejects.toThrow('Structured LLM provider failed');
+    await rejected;
     expect(signal?.aborted).toBe(true);
     expect(calls).toBe(1);
   });
