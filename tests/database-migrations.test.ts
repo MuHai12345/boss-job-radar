@@ -53,13 +53,13 @@ function createObservation(
 }
 
 describe('SQLite migrations', () => {
-  it('applies schema version 5 to a fresh database and records it', () => {
+  it('applies schema version 6 to a fresh database and records it', () => {
     const database = new SqliteDatabase(':memory:');
 
     try {
       runMigrations(database);
 
-      expect(CURRENT_SCHEMA_VERSION).toBe(5);
+      expect(CURRENT_SCHEMA_VERSION).toBe(6);
       expect(
         database
           .prepare(
@@ -96,6 +96,7 @@ describe('SQLite migrations', () => {
           version: 4,
         },
         { applied_at: expect.any(String), name: 'create_search_run_salary_decoding', version: 5 },
+        { applied_at: expect.any(String), name: 'create_job_status_tracking', version: 6 },
       ]);
     } finally {
       database.close();
@@ -145,12 +146,12 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (6, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (7, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
 
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 6 is newer than supported version 5',
+        'Database schema version 7 is newer than supported version 6',
       );
       expect(
         database
