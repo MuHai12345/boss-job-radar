@@ -44,7 +44,11 @@ describe('analysis refresh isolation', () => {
       expect(first.ids).toHaveLength(2);
       expect(analyses.getLatestForJob(1)).toBeNull();
       expect(analyses.getLatestForJob(2)).not.toBeNull();
-      expect(diagnostic.mock.calls).toEqual([['Deterministic analysis refresh failed.']]);
+      expect(diagnostic.mock.calls).toEqual([
+        ['Deterministic analysis refresh failed.'],
+        ['Job opportunity assessment refresh failed.'],
+      ]);
+      expect(JSON.stringify(diagnostic.mock.calls)).not.toContain('SENSITIVE_SENTINEL');
       for (const [table, count] of [['import_runs', 1], ['search_runs', 1], ['job_observations', 2], ['jobs', 2]] as const) {
         expect(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()).toEqual({ n: count });
       }
@@ -72,8 +76,11 @@ describe('analysis refresh isolation', () => {
       });
       expect(response.status).toBe(201);
       expect(await response.json()).toEqual({ ids: [1, 2] });
-      expect(diagnostic.mock.calls.every((call) => JSON.stringify(call) === '["Deterministic analysis refresh failed."]')).toBe(true);
-      expect(diagnostic).toHaveBeenCalled();
+      expect(diagnostic.mock.calls).toEqual([
+        ['Deterministic analysis refresh failed.'],
+        ['Job opportunity assessment refresh failed.'],
+      ]);
+      expect(JSON.stringify(diagnostic.mock.calls)).not.toContain('SENSITIVE_SENTINEL');
       await service.close();
       database.close();
       inspection.exec('DROP TRIGGER fail_analysis');
@@ -107,7 +114,11 @@ describe('analysis refresh isolation', () => {
       expect(health.status).toBe(200);
       expect(await health.json()).toEqual({ service: 'boss-job-radar-local', status: 'ok' });
       if (failRefresh) {
-        expect(diagnostic.mock.calls).toEqual([['Deterministic analysis refresh failed.']]);
+        expect(diagnostic.mock.calls).toEqual([
+          ['Deterministic analysis refresh failed.'],
+          ['Job opportunity assessment refresh failed.'],
+        ]);
+        expect(JSON.stringify(diagnostic.mock.calls)).not.toContain('PRIVATE_JD_PATH_STACK');
         inspection.exec('DROP TRIGGER fail_startup');
       }
       expect(runtime.database.imports.importBatch(request()).ids).toHaveLength(2);
