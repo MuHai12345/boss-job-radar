@@ -2,117 +2,148 @@
 
 ## 当前状态快照
 
-- 当前阶段：`Phase 5 / Batch 2`
-- 下一步骤：`Phase 5 / Batch 2 external review`
-- 当前状态：`Phase 5 - IN PROGRESS / NOT YET PASSED`
-- 已通过的最后 implementation commit：`7f7ff619ca03c1855a2fdd0d1fa88731207d1328`
+- 仓库：`MuHai12345/boss-job-radar`
+- 分支：`master`
+- 当前阶段：`Phase 5`
+- 当前批次结论：`Phase 5 / Batch 3 — PASS`
+- 下一步骤：`Phase 5 / Batch 4 — Capability 11（成长性 / 转行价值 / 风险 / 优先级 / 面试追问）`
+- Phase 5：`IN PROGRESS`
+- 最后产品实现 commit：`c40528526610d764d1c5987852124d2d2fcc7447`
+- Batch 3 外部测试完成 head：`1d6ed4405c53eb55318541a5e6ed0d2f3693d78b`
+- 核心能力矩阵：`11 / 15 VERIFIED`
+- 当前实现阻塞：无
+
+## 阶段结论
+
 - Phase 0：`PASS`
 - Phase 1：`PASS`
-- Phase 1 / Batch 1：`PASS`
-- Phase 1 / Batch 2：`PASS`
-- Phase 1 / Batch 3：`PASS`
-- Phase 1 / Batch 1 人工浏览器验证：用户报告 `PASS`
-- Phase 2 / Batch 1：`PASS`
-- Phase 2 / Batch 1 privacy repair：`PASS`
-- 真实 BOSS 首页 probe：用户报告成功
-- 真实 BOSS 搜索结果页验证：`PASS`；已确认 `ul.rec-job-list` 列表容器和 `li.job-card-box` 岗位卡片容器
-- 真实 BOSS 详情页：用户报告多个 Targeted Probe 样本成功，字段级 selector 已经外部多样本比对
-- 真实页面结构：用户已完成搜索页和多个详情页 Targeted Probe，外部网页版 ChatGPT 已完成多样本结构比对
-- Phase 2 / Batch 2：`PASS`
-- Phase 2 / Batch 3：`PASS`
-- Phase 2 / Batch 4：`PASS`
 - Phase 2：`PASS`
-- verified parser：`PASS`
-- verified URL privacy repair：`PASS`
-- 真实 search selector：已形成 verified profile；业务 tags、招聘者活跃状态和发布时间保持未知
-- 真实 detail selector：已形成 verified profile；发布时间保持未知，当前岗位 URL 由调用方显式提供
-- salary PUA：已建立纯内存、动态、证据驱动的 mapping core；未硬编码真人映射，未下载、解析或逆向字体
-- 当前能力：用户主动点击后，可在支持的当前 BOSS 页面执行一次结构化 DOM extraction；也可通过独立保存动作重新解析当前页面，并经安全 localhost session 把 observation append 到本机 SQLite
-- Phase 2 / Batch 4 真实页面人工验证：最终结构化重验通过；verified detail visible-text extraction 能排除 `visibility: hidden`、zero-size、`display: none` 等隐藏 descendant 干扰，tags 恢复为正常可见语义
-- 真实页面后台自动采集：仍未开始
-- local service：Phase 3 / Batch 1 已通过外部验收；固定绑定 IPv4 loopback `127.0.0.1` 且 host 不可配置。Phase 4 / Batch 1 已通过外部验收并形成 SQLite + HTTP 的统一 production runtime lifecycle。Phase 4 / Batch 2 已通过外部验收，提供受严格 Host、Origin、ephemeral token、Content-Type、Content-Encoding、1 MiB body limit 和 runtime DTO validation 保护的 `POST /observations`，没有 permissive CORS
-- SQLite storage foundation：Phase 3 / Batch 2 已通过外部验收；包含 `better-sqlite3` `13.0.3`、显式 database path 打开、`foreign_keys = ON`、ordered transactional migrations 和 future migration fail-closed。Phase 4 / Batch 4 将 schema 升至 version 2，新增 `jobs` identity/lifecycle 表、observation link 与安全 backfill
-- observation persistence API：Phase 3 / Batch 3 已通过外部验收；包含有限的 append、get by id、append-only semantics、runtime string-array JSON validation、prepared SQL parameter binding，以及 close / reopen / readback recovery。Phase 4 / Batch 2 新增 transactional `appendMany`；Phase 4 / Batch 4 让单条与批量成功事务都完成 Job resolve/create、observation linking 和 lifecycle update，重复 observation 仍独立保留
-- Job identity：Phase 4 / Batch 4 已通过外部验收；非 NULL `job_url` 按已保存字符串 exact equality 复用 canonical Job，NULL URL 每条 observation 独立 unresolved，不使用 title/company 等弱字段合并；first/last/latest 只基于 `captured_at` 与 observation id
-- production DB path：Phase 4 / Batch 1 已通过外部验收；使用用户级 OS data directory policy，database filename 固定为 `boss-job-radar.sqlite3`，不接受 arbitrary production path override；Windows 仅接受明确 allowlist 中的 filesystem absolute roots，POSIX 最终 app directory 收紧为 `0700`
 - Phase 3：`PASS`
-- Phase 3 / Batch 1：`PASS`
-- Phase 3 / Batch 2：`PASS`
-- Phase 3 / Batch 3：`PASS`
 - Phase 4：`PASS`
-- Phase 4 / Batch 1：`PASS`
-- Phase 4 / Batch 2：`PASS`
-- Phase 4 / Batch 3：`PASS`
-- Phase 4 / Batch 4：`PASS`
-- Phase 4 / Batch 5：`PASS`
-- Phase 5：`IN PROGRESS / NOT YET PASSED`
-- Phase 5 / Batch 1：`PASS`（依据本轮外部 Prompt）
-- Phase 5 / Batch 2：`implementation_complete_awaiting_external_review`
-- 核心能力矩阵：9 / 15 VERIFIED；1 项 IMPLEMENTED_AWAITING_REVIEW；5 项 NOT_STARTED
-- Phase 3 implementation lineage：`b73dc43869764f4bbd4d9de6e22d75acc0baed5f` → `b667eaa222bc065f1faff254e7a2d4c640fbf86d` → `05e5b3e6441499a213544b6b6961ecefa765afac`
-- 当前阻塞：无实现阻塞；等待外部网页版 ChatGPT 独立审阅 Phase 5 / Batch 2
-- 权限边界：Codex 无权自行宣布 Phase 5 / Batch 2 `PASS` 或开始下一批
-- 仍未实现：
-  - final Job aggregation
-  - observation dedupe（按设计不实现）
-  - AI
-  - Dashboard
-  - auto browsing
-  - auto apply/chat
+- Phase 5 / Batch 1：`PASS`
+- Phase 5 / Batch 2：`PASS`
+- Phase 5 / Batch 3：`PASS`
 
-## 状态语义
+Phase 5 尚未整体结束；Capability 11 尚未开始。Capability 12（structured LLM analysis）属于后续 Phase 6，不得提前混入下一批。
 
-这里的当前状态只表示：
+## 已验证核心能力
 
-> 依据本轮外部 Prompt，Phase 0–4 均已获外部 `PASS`，Phase 4 / Batch 1–5 全部 `PASS`。Phase 5 / Batch 1 已正式外部 PASS；Phase 5 / Batch 2 的 SearchRun 范围薪资解码已实现，等待外部审阅；Phase 5 为 `IN PROGRESS / NOT YET PASSED`。developer verification 不等于 external acceptance。
+1. 真实 BOSS 当前页面 structured extraction
+2. 原始事实 / 完整 JD / canonical link / unknown 保真
+3. 本地 SQLite persistence / migration / recovery
+4. 安全 localhost observation ingestion
+5. 手动 extension → localhost save
+6. Job identity / canonical URL dedupe / first_seen / last_seen
+7. SearchRun / provenance / idempotent import
+8. 确定性岗位真实性质识别
+9. 经验硬门槛 / 偏好 / 矛盾识别
+10. 招聘者活跃 / 平台新鲜度 / local observation recency / link 状态判断
+15. SearchRun 范围薪资 PUA 可信解码与正式产品链路
 
-该结论不表示：
+尚未开始：Capability 11–14。
 
-- verified selector 是 BOSS 官方或永久稳定的 contract；
-- Phase 5 / Batch 2 已通过外部验收；
-- observation dedupe、AI 或 Dashboard 已实现。
+## Phase 5 / Batch 3 验收状态
 
-Phase 2 最终验收对应的实现 lineage 为：`4f7b9909d1d9edfb6eb910aa35c1263925191800`（Batch 4 structured extraction）→ `af65049e7e0c789db1d5c42f10ab00c8a2bed0f3`（首轮 tag attribution repair）→ `30a794b65e2a7e347d7df1ef3d345d064a876cbc`（verified visible-text repair）→ `48b60ca88e4ce043dd96267fdbcc7f6a7c98c395`（保留的人工 hidden-node diagnostic）。
+### 产品实现 lineage
 
-## 能力现状
+- initial implementation：`3f04bb40ce14e0e1b106e7b311a03f1c31bc3b98`
+- status handling repair：`34f108ae7b281597d2291d9deacabef8ec112369`
+- lint-only repair：`c40528526610d764d1c5987852124d2d2fcc7447`
 
-仓库当前包含最小浏览器扩展工程、共享 BOSS URL policy，以及 synthetic fixture profiles 和经真人多样本人工验证的 BOSS selector profiles。岗位卡片与详情 parser 仍是由调用方传入 DOM root 的纯函数；verified detail 的 `fullJdText` 和 `rawDetailText` 均限定于 `.job-sec-text`，保留合理换行并排除 `SCRIPT`、`STYLE`、`NOSCRIPT`、`TEMPLATE`。selector 失效或字段未知时保留记录并显式报告 missing field。
+Batch 3 新增/完善：
 
-popup 保留用户主动触发的通用有限 DOM 结构诊断和 Targeted DOM Structure Probe，并新增“解析当前岗位数据”。结构化解析只在用户点击后重新确认活动标签页，并且只支持 `/web/geek/jobs` 与单层 `/job_detail/*.html`。verified profiles 作为 JSON-safe 参数传入自包含 injected function；结果只显示在 popup，不保存、不上传、不发网络请求。
+- schema v6 `job_link_checks` / `job_status_assessments`
+- recruiter activity deterministic buckets
+- platform freshness deterministic buckets
+- local observation rolling recency buckets
+- manual job detail link status inspection
+- `available` / `explicitly_unavailable` / `unknown` fail-closed semantics
+- append-only link-check history
+- current assessment materialization across recency bucket changes
+- popup active-tab fail-closed handling
+- safe localhost `/job-link-checks` write path
 
-搜索页只解析当前 DOM 已有的前 100 张岗位卡片，保留实际 `matchedCardCount` 并在超限时返回 `card_limit_reached`；薪资保留列表 DOM 原始文本，不接入 salary mapping。详情页当前岗位 URL 来自清理后的 `document.location`，`fullJdText` 和 `rawDetailText` 都只来自 verified `.job-sec-text`。整个流程不自动点击、滚动、翻页、打开详情或读取 Cookie/storage。
+### 外部自动化验收
 
-用户已报告 BOSS 首页、搜索结果页和详情页的人工 probe 均成功，并已完成搜索页和多个详情页的 Targeted Probe。外部网页版 ChatGPT 已从匿名样本确认字段级 selector；本轮将它们与 synthetic profiles 明确分离并通过脱敏 real-shape fixtures 接入纯 parser。
+外部网页版 ChatGPT 已建立 `.github/workflows/ci.yml` 并维护测试代码。最终 Batch 3 CI head：
 
-列表 parser 继续忠实保留原始薪资 DOM 文本，不自动解码 PUA。salary mapping core 根据列表原文和已验证详情薪资学习字符映射；Batch 2 在 local service 中加入 SearchRun 范围的持久化派生层。结构不一致、非数字映射、映射不完整或冲突均返回明确状态，不猜测薪资。
+`1d6ed4405c53eb55318541a5e6ed0d2f3693d78b`
 
-verified card link 只保留通过严格校验的 BOSS job detail canonical URL，并删除 query/hash；`jobHrefRaw` 和 `jobUrl` 都不会保存 security/tracking 参数。generic/synthetic parser 的原始链接兼容行为不变。
+GitHub Actions run：`34124021524`
 
-项目包含固定绑定 `127.0.0.1` 的 Node HTTP 服务；host 不可配置，production port 可在严格校验后有限配置，`GET /health` contract 保持不变。Phase 3 / Batch 2 建立 `better-sqlite3` `13.0.3`、foreign keys 与 ordered transactional migrations；Phase 3 / Batch 3 建立 append-only observation repository 与 file-backed recovery。Phase 4 / Batch 1、Batch 2、Batch 3 已分别完成并通过 production data path/runtime、受保护 `POST /observations` 和手动 extension → localhost bridge。Phase 4 / Batch 4 将 schema 升至 version 2：migration 保留并关联全部既有 observations，非 NULL `job_url` exact group 形成一个 canonical Job，NULL URL observation 各自形成 unresolved Job；first/last/latest 使用 `captured_at` 与 observation id。新的 `append` / `appendMany` 在完整事务内插入 observation、resolve/create Job、写入 `job_id` 并更新 lifecycle，任一步失败全部 rollback。Job repository 只提供 `getById` / `findByJobUrl`；HTTP input 仍不接受 `jobId`，成功响应仍只返回 observation IDs。Phase 4 / Batch 4 已由外部验收为 `PASS`。项目仍没有 observation dedupe、最终 Job aggregate facts、AI 分析或 Dashboard。
+结果：
 
-Phase 4 / Batch 5 将 schema 升至 version 3、bridge protocol 升至 version 2。每次用户保存从 structured extraction 原样构造 source 与 observations，并 fresh 生成仅保留在当前调用内存中的 clientImportId。ImportRepository 在单一事务内执行 runtime validation、固定字段 SHA-256、ImportRun、搜索页 SearchRun、observation provenance 与 Job lifecycle。历史 observation 的 import_run_id 保持 NULL，读取正常，不推测历史 runs。
+- `npm ci`：PASS
+- `npm run typecheck`：PASS
+- `npm run lint`：PASS
+- `npm test`：PASS — **43 test files / 634 tests passed**
+- `npm run build`：PASS
+- `npm run build:edge`：PASS
+- `npm run build:local`：PASS
+- `npm run verify:manifests`：PASS
 
-相同 clientImportId 与相同 payload 的 replay 返回原 observation IDs，关闭/重开数据库后仍然有效；不同 payload 返回 409 import_conflict。不同点击始终新增 observations，canonical Job 继续复用。搜索保存保留实际 matched count 与 saved count（例如 143/100）及 warning 原顺序；detail matched count 为 NULL 且不创建 SearchRun。空结果不连接 localhost。SearchRun 通过 ImportRun 和 observations 可追溯到本次观察到的 Jobs。
+Batch 3 专项自动化覆盖包括：
 
-客户端只对 POST 网络失败、响应 body 丢失或传输 timeout 最多重试一次，复用已序列化的同一 payload 和 UUID；400/403/409/413/500 不重试。session 与成功 POST 均验证 application/json Content-Type，允许 charset。Host、Origin、token、identity encoding、1 MiB body limit、loopback-only 和无 permissive CORS 边界保持不变，GET /health 不变。Batch 5 已获外部 PASS。
+- schema v6 migration / constraints / future-version fail-closed
+- recruiter activity / platform freshness / local recency buckets
+- status source selection and older-source warnings
+- link check request validation and canonical URL policy
+- automatic `available` evidence and idempotent import replay
+- manual link history and newer `available` superseding older unavailable fact
+- `/job-link-checks` Host / Origin / token / content type / validation / 404 / 201 / generic 500 behavior
+- local-service link-check client fresh session and no POST retry
+- request-level navigation / challenge / unstable document fail-closed handling
+- popup active-tab disappears / throws fail-closed regression
+- popup concurrency lock
+- DOM probe exact unavailable markers, hidden-text rejection, challenge/login/iframe unknown behavior, long-JD false-positive protection
+- full existing regression suite
 
-## Phase 5 / Batch 1 实现状态
+### 真实浏览器验收
 
-- 新增 schema version 4：独立 `deterministic_job_analyses`，migration 不执行业务 backfill，不更新 JobObservation facts。
-- 规则版本：`deterministic-job-analysis-v1`。两轴为岗位性质四种状态、经验要求五种状态；无总分和 LLM。
-- source selection：latest pointer 提供当前 title/header/tags；从同 Job 全部历史按 captured_at DESC、id DESC 复用最近非空完整 JD，分别保存两个来源 ID。复用旧 JD 增加非阻塞 warning。
-- 简单 section detection、核心/偏离职责族、紧邻否定与保守聚合均已实现；要求段和 title/tags 作为上下文，不等同职责。
-- 经验解析保留 header、JD 显式硬年限/优先/无要求、原文 evidence 与矛盾。`1年以内` + `工作2年以上` 输出 contradictory、hardMinimumYears=2；`1-3年` + `1年经验优先` 保留软偏好，记录 mismatch，minimum=null。
-- `LocalDatabase.analyses` 提供 analyzeJob/getLatestForJob/refreshAll；同 latest/rules 幂等，新键追加历史；当前查询不返回 stale；存储 JSON 经 runtime validation 后读取。
-- ImportRun 源数据 commit 后再独立分析受影响 Jobs；HTTP listener 启动后 backfill 已有 Jobs。异常只记录固定 generic diagnostic，不撤销采集、不阻止服务或保存，可随后补齐。
-- 详细阈值、读取 contract 与限制见 [ADR-0012](decisions/ADR-0012-deterministic-job-analysis-v1.md)；开发命令和结果见 [本批工作日志](worklogs/2026-09-05-phase-5-batch-1-deterministic-analysis.md)。
-- 状态为 `implementation_complete_awaiting_external_review`；不开始下一批。
+用户本人在真实登录 BOSS 岗位详情页完成：
 
-## Phase 5 / Batch 2 实现状态
+- link status action 正常显示：PASS
+- 正常岗位判断 `available`：PASS
+- local service 保存链路：PASS
 
-- schema version 5；规则 `search-run-salary-mapping-v1`。三张新表仅存派生 mapping、evidence provenance 和 decoding history，不更新原始薪资、parser 或 Job identity。
-- 同 canonical Job、明确 SearchRun provenance、detail 明文、向后 24h 闭区间；最近时间优先、同时间高 ID 优先。core 完整验证结构后才判 mapping conflict。
-- 映射独立于每个 SearchRun，revision 从 0 开始；新字符和首次 conflict 增加 revision；重复 evidence 不增加。候选被后来导入的更近详情替换时从当前候选集合重建，状态变化追加 revision，保留旧历史；已 conflicted 不恢复。
-- plain salary 直接保留明文；PUA 仅在完整 verified mapping 时输出；incomplete / conflict 的 decodedText 为 null；nullable 原始薪资不创建结果。
-- 导入事实和确定性分析阶段之后独立刷新，HTTP listener 启动后补旧数据。逐 Run 事务隔离；失败只输出 `Salary decoding refresh failed.`，不能 rollback 源事实或分析。
-- 本轮 developer verification 见 [工作日志](worklogs/2026-09-05-phase-5-batch-2-salary-decoding.md)，不等于 external acceptance。当前状态为等待外部审阅，不进入下一批。
+当前没有自然出现的样本：
+
+- 真实 `explicitly_unavailable` 页面：`DEFERRED`
+- 真实 CAPTCHA / 登录 / security challenge → `unknown` 页面：`DEFERRED`
+
+这两个真实页面场景不伪造 PASS，也不要求用户刻意触发风控；对应 fail-closed 行为已有自动化测试。后续自然遇到时可补充真实浏览器验证，不阻塞 Batch 3 当前验收。
+
+正式记录：`docs/verification/2026-09-07-phase-5-batch-3-external-verification.md`
+
+## 协作与测试规则
+
+当前长期分工以 `AGENTS.md` 为准：
+
+- Codex：只负责外部 Prompt 指定的产品代码实现、commit、push。
+- Codex 不负责测试代码，不运行测试/typecheck/lint/build/manifest verification，不做 QA 或最终验收。
+- 外部网页版 ChatGPT：负责全部测试代码、CI、代码审阅、验证、验收和状态文档。
+- 用户不是 CMD 测试执行器；仅在无法远程复现的真实登录 BOSS 浏览器场景下执行最少量人工验证。
+
+## 下一批约束
+
+下一批是 Phase 5 / Batch 4，即 Capability 11：
+
+> 成长性 / 转行价值 / 风险 / 优先级 / 面试追问
+
+下一批必须继续遵守：
+
+- 基于已保存的真实事实、完整 JD、Capability 8/9/10 的确定性结果；
+- 高召回，不静默删除任何岗位；
+- 不以单一总分覆盖各维度；
+- unknown 必须保留 unknown，不能猜测缺失信息；
+- 结果必须可解释、可追溯、可版本化；
+- 仍不引入 LLM；
+- 不做 Dashboard；
+- 不自动投递、聊天、打招呼；
+- 不增加后台抓取、私有 API、Cookie/Session、验证码/风控绕过。
+
+## 长期产品边界
+
+当前搜索范围仍以用户本人正常使用 BOSS直聘 时可见的数据为基础。系统不保存密码、验证码、Cookie 或 Session，不调用/逆向 BOSS 私有 API，不后台无人值守采集，不自动翻页，不自动投递，不自动聊天。
+
+所有岗位必须保留可供用户人工查看；低优先级、疑似伪运营、经验不匹配、招聘状态差或信息不足，只能被标记/排序，不能被静默删除。

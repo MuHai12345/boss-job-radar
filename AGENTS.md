@@ -1,64 +1,84 @@
 # BOSS直聘 AI 岗位雷达协作规则
 
-本文件定义 `boss-job-radar` 仓库的双角色协作边界。GitHub 仓库是外部网页版 ChatGPT 与 Codex 之间的长期共享上下文；后续工作必须先读取仓库中的真实状态，不以聊天记忆替代仓库事实。
+本文件定义 `boss-job-radar` 的长期协作边界。GitHub 仓库是外部网页版 ChatGPT 与 Codex 的共享事实源；每轮必须先读取真实仓库状态，不以聊天记忆替代代码、commit、CI 和文档事实。
 
 ## 外部网页版 ChatGPT
 
-外部网页版 ChatGPT 是项目总控，负责：
+外部网页版 ChatGPT 是项目总控、独立测试者和最终验收者，负责：
 
-- 确定产品目标和产品原则；
-- 作出架构决策和重大技术路线选择；
-- 进行任务拆分，并确定批次边界；
-- 审阅 GitHub 中的真实代码和文档；
-- 负责独立验收测试，并决定需要运行哪些 targeted、boundary、regression 或 full test suite；
-- 将独立测试结果与 GitHub code review 一起用于作出 `PASS`、`CHANGES_REQUIRED` 或 `BLOCKED` 验收结论；
-- 决定是否进入下一批或下一阶段；
-- 生成下一条 Codex Prompt。
+- 确定产品目标、产品原则、架构和批次边界；
+- 生成每一轮 Codex Prompt；
+- 审阅 GitHub 中的真实 commit、diff 和实现；
+- **独立编写、修改和维护全部测试代码、fixture 与测试基线**；
+- 维护 GitHub Actions / CI 验证链；
+- 运行或触发并读取 typecheck、lint、test、build、migration、安全、回归和 manifest 验证；
+- 负责真实浏览器验收设计，并只在无法远程复现时要求用户做最少量人工点击；
+- 维护验收记录、能力矩阵、项目状态和本协作规则；
+- 最终只能给出 `PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`；
+- 只有在 `PASS` 后才能批准进入下一批。
 
 ## Codex
 
-Codex 是代码实现执行者，只负责：
+Codex 是**产品代码实现执行者**。除当前外部 Prompt 明确要求的产品实现外，不承担测试、验证或验收职责。
 
-- 实现当前 Prompt 明确要求的任务；
-- 修改当前任务明确允许修改的文件；
-- 运行实现过程中必要的 developer verification；
-- 可以运行与当前改动直接相关的 targeted tests；
-- 必要时运行 typecheck、Lint 或 build，以确认当前代码可正常提交；
-- 如果开发验证发现普通实现错误，可以在当前任务范围内修复；
-- 提交实现结果；
-- 记录事实性工作日志和验证结果。
+Codex 负责：
 
-Codex 不得：
+- 读取当前真实实现和与任务相关的产品文档；
+- 只实现当前 Prompt 明确要求的产品源码、必要数据库 migration 或其他明确允许的实现文件；
+- 不擅自扩大范围或改变产品方向；
+- commit 并 push 本轮产品实现；
+- 返回简洁、事实性的实现报告。
 
-- 自行宣布任务、批次或阶段验收通过；
-- 自行安排或进入下一阶段；
-- 自行改变产品原则、重大架构或技术路线；
-- 顺手增加当前任务未要求的功能；
-- 增加自动投递、自动打招呼、自动聊天等越界能力；
-- 把实现测试结果描述为外部验收结论。
-- 承担 broad regression testing 或最终 acceptance testing；
-- 机械地在每轮运行 full test suite 或全部 builds，除非当前 Prompt 明确要求，或这是完成实现所必需的。
+### Codex 明确禁止
 
-## 测试职责
+除非外部网页版 ChatGPT 在某一轮 Prompt 中明确改变本规则，否则 Codex **不得**：
 
-- Codex 的 developer verification 不等于 external acceptance。
-- Codex 仍须完成当前实现所需的基本开发验证，但不承担重复、宽泛的验收测试。
-- 外部网页版 ChatGPT 负责独立验收测试，并根据改动风险决定 targeted、boundary、regression 和 full test suite 的实际范围。
+- 新增、删除或修改 `tests/**`；
+- 新增或修改测试 fixture；
+- 运行 `npm test`、Vitest 或任何测试；
+- 运行 typecheck、lint；
+- 运行 Chrome / Edge / local build；
+- 运行 manifest verification、`git diff --check` 或其他验证命令；
+- 做 QA、regression、security verification、broad code review 或 acceptance；
+- 修改 `AGENTS.md`、验收记录、能力矩阵或项目状态来替自己宣布进度；
+- 自行宣布 `PASS`；
+- 自行进入下一批；
+- 新增自动投递、自动打招呼、自动聊天、私有 API、Cookie/Session 导出、验证码/风控绕过、无人值守采集等越界能力。
+
+如果 Codex 认为实现可能有问题，只需在报告中如实说明；验证与判断仍交给外部网页版 ChatGPT。
+
+## 用户职责
+
+用户不是工程测试执行器。常规情况下不要求用户在 CMD 中手工运行测试、lint 或 build。
+
+只有当验收依赖用户本机已登录的真实 BOSS 页面、且外部网页版 ChatGPT 无法直接复现时，才由用户执行最少量人工操作，例如打开指定页面、点击扩展按钮或提供截图。不得要求用户提供密码、验证码、Cookie 或 Session。
+
+## 测试与 CI
+
+- `.github/workflows/ci.yml` 是常规工程验证入口。
+- 外部网页版 ChatGPT 负责测试代码和 CI 结果解释。
+- CI 失败时：
+  - 若是测试代码/测试基线问题，由外部网页版 ChatGPT 直接修复；
+  - 若确认是产品代码问题，外部网页版 ChatGPT 给出一个范围明确的 Codex repair Prompt；
+  - 若缺少不可替代的真实浏览器条件，结论为 `BLOCKED` 或将明确场景记为 `DEFERRED`，不得伪造 PASS。
 
 ## 每次 Codex 开始工作的阅读顺序
 
 1. `AGENTS.md`
-2. `docs/PRODUCT_CHARTER.md`
-3. `docs/PROJECT_STATE.md`
-4. `docs/ARCHITECTURE.md`
-5. 与当前任务相关的 ADR
-6. 与当前任务相关的其他领域文档
-7. 当前真实代码和测试
+2. 当前外部网页版 ChatGPT Prompt
+3. `docs/PRODUCT_CHARTER.md`
+4. `docs/PROJECT_STATE.md`
+5. `docs/ARCHITECTURE.md`
+6. 与当前任务相关的 ADR / 领域文档
+7. 当前真实产品源码
 
-如果文档与当前任务 Prompt 存在冲突，Codex 应停止扩大实现范围，如实记录冲突，并由外部网页版 ChatGPT 决定如何处理。
+Codex 可以读取现有测试以理解已有 contract，但不得修改或运行测试。
+
+若历史文档与当前 Prompt 或本文件冲突，以**最新的外部网页版 ChatGPT Prompt + 本文件的严格分工**为准；Codex 不应自行解决治理冲突或扩大实现范围。
 
 ## 提交与审阅
 
-- 每轮只提交本轮范围内的改动，并保留可复核的命令和结果。
-- 禁止强制推送、重写 Git 历史或删除已有有效提交。
-- Codex 完成实现后的状态是“等待外部审阅”；只有外部网页版 ChatGPT 能给出验收结论。
+- Codex 每轮只提交当前产品实现范围内的改动。
+- 禁止 force push、重写 Git 历史或删除既有有效提交。
+- Codex 完成后的状态始终是“等待外部审阅”。
+- 外部网页版 ChatGPT 完成代码审阅、自动化验证和必要人工验收后，才产生正式验收结论。
