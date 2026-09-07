@@ -43,15 +43,19 @@
 - Phase 5：`PASS`
 - Phase 6 / Batch 1：`PASS`（provider-neutral structured LLM analysis foundation）
 - Phase 6 / Batch 2：`PASS`（OpenAI Responses provider transport v1）
+- Phase 6 / Batch 3：`PASS`（product-specific local OpenAI config + protected explicit localhost analysis trigger）
 - Phase 6：`IN_PROGRESS`
 
 Phase 6 / Batch 1 已验证：最小输入快照、prompt-injection boundary、strict structured output validation、evidence grounding、schema v8、provider/model/source-state persistence、provider-call idempotency、source-change race、transaction boundary 和失败语义。
 
 Phase 6 / Batch 2 已验证：OpenAI provider/model allowlist、API key constructor secret boundary、固定 Responses endpoint、system/user prompt 分离、Structured Outputs `json_schema` + strict、`store:false`、no tools/conversation、completed-only response parsing、refusal/incomplete/malformed fail-closed、45 秒 timeout、AbortController、zero retry 和完整回归。
 
-Capability 12 仍不提前标记 `VERIFIED`。下一批为本地受控 OpenAI 配置 + 受保护的显式 localhost 分析 trigger；之后仍需浏览器显式用户动作和代表性脱敏真实模型评测。
+Phase 6 / Batch 3 已验证：产品专用 key/model env、disabled-by-default、partial/invalid config fail closed、startup secret sanitization、runtime optional provider、protected `POST /structured-llm-analyses`、exact canonical jobUrl-only request、Host/Origin/token/content-type/encoding/body-limit security、id-only success response、generic failure hygiene、startup/import/link/status/opportunity 0 provider calls、same-state explicit-trigger idempotency。最终 **50 test files / 714 tests passed**。
+
+Capability 12 仍不提前标记 `VERIFIED`。下一批为 popup 中的显式用户分析动作；该动作通过后仍需用户明确同意后的代表性真实 OpenAI 模型评测。
 
 正式记录：
 
 - `docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
 - `docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
+- `docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
