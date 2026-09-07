@@ -71,7 +71,7 @@ describe('SearchRun salary persistence', () => {
     imports.importBatch(salaryRequest(['6K'], 'job_detail', time, ['other']));
     salary.refreshAll();
     expect(salary.getMappingForSearchRun(2)).toMatchObject({ status: 'active', characters: { [x]: '6' } });
-    expect(salary.getCurrentForObservation(next.ids[0]!)).toMatchObject({ decodedText: '6K' });
+    expect(salary.getCurrentForObservation(next.ids[0]!)?.decodedText).toBe('6K');
     salary.refreshAll(); expect(salary.getMappingForSearchRun(1)?.revision).toBe(2);
   });
   it('allows mapping rotation with two active runs', () => {
@@ -120,7 +120,6 @@ describe('SearchRun salary persistence', () => {
   });
   it('chooses the nearest eligible detail then highest id, never combines candidates', () => {
     const { observations, imports, salary, db } = setup();
-    // Seed details directly so all candidates are available to the first refresh.
     observations.append(salaryRequest(['7K'], 'job_detail', '2026-09-05T12:00:00.000Z').observations[0]!);
     observations.append(salaryRequest(['9K'], 'job_detail', '2026-09-05T11:00:00.000Z').observations[0]!);
     const chosen = observations.append(salaryRequest(['8K'], 'job_detail', '2026-09-05T11:00:00.000Z').observations[0]!);
@@ -129,7 +128,7 @@ describe('SearchRun salary persistence', () => {
     expect(salary.getCurrentForObservation(search.ids[0]!)?.decodedText).toBe('8K');
     expect(db.prepare('SELECT detail_observation_id FROM salary_mapping_evidence').all()).toEqual([{ detail_observation_id: chosen.id }]);
   });
-  it('uses schema version five', () => { expect(CURRENT_SCHEMA_VERSION).toBe(5); });
+  it('uses schema version six', () => { expect(CURRENT_SCHEMA_VERSION).toBe(6); });
   it('does not increase revision for a second evidence that adds no characters', () => {
     const { imports, salary } = setup();
     imports.importBatch(salaryRequest([`${x}K`, `${x}K`]));
