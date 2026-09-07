@@ -165,6 +165,35 @@ describe('job opportunity repository and refresh chain', () => {
     }
   });
 
+  it('fails closed on a structurally valid but semantically altered current assessment', () => {
+    const { database, imports, observations, opportunities } = setup();
+    try {
+      const imported = imports.importBatch(importRequest('b8f3bb11-be51-4d5f-9dbb-e48ec5f408fd'));
+      const jobId = observations.getById(imported.ids[0]!)!.jobId;
+      const current = opportunities.getLatestForJob(jobId, '2026-09-07T12:00:00.000Z');
+      expect(current?.priority.tier).toBe('S');
+
+      const altered = {
+        ...current!,
+        priority: {
+          tier: 'C',
+          reasonCodes: ['explicitly_unavailable'],
+        },
+      };
+      database.prepare(`
+        UPDATE job_opportunity_assessments
+        SET assessment_json = ?, priority_tier = 'C'
+        WHERE id = (SELECT MAX(id) FROM job_opportunity_assessments)
+      `).run(JSON.stringify(altered));
+
+      expect(() => opportunities.getLatestForJob(jobId, '2026-09-07T13:00:00.000Z')).toThrow(
+        'Invalid stored job opportunity assessment',
+      );
+    } finally {
+      database.close();
+    }
+  });
+
   it('isolates opportunity refresh failure from committed imports and uses only the generic diagnostic', () => {
     const { database, imports } = setup();
     const diagnostic = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
