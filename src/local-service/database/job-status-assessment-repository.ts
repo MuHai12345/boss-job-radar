@@ -121,7 +121,7 @@ export function createJobStatusAssessmentRepository(database: SqliteDatabase.Dat
     assessJob,
     getLatestForJob(jobId, assessedAt = new Date().toISOString()) {
       const source = readSource(jobId);
-      return source === null ? null : readCurrent(source, assessedAt);
+      return source === null ? null : readCurrent(source, assessedAt) ?? assessJob(jobId, assessedAt);
     },
     refreshAffectedByJobs,
     refreshAll() {

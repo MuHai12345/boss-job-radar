@@ -44,8 +44,7 @@ export async function initializeJobLinkCheck(root: ParentNode, dependencies: {
         status.textContent = unknownMessage;
       } finally {
         inFlight = false;
-        if (tab === undefined) button.disabled = false;
-        else applyTab(tab);
+        applyTab(tab);
       }
     })();
   });
