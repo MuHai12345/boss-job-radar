@@ -6,13 +6,12 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 1 — PASS`
+- 最近完成批次：`Phase 6 / Batch 2 — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一批：`Phase 6 / Batch 2 — OpenAI Responses provider transport v1`
-- Batch 1 Codex 产品实现 commit：`c8edc28f7a521098db132460a9d64ee34fecae27`
-- Batch 1 产品 lineage merge：`beb7bcb9ab87893b8626761d97b77cd19596acf5`
-- Batch 1 最终外部测试 head：`20b208721f119155ceed4d8421f10f7238ea9557`
-- Batch 1 最终 CI run：`34132535995`
+- 下一批：`Phase 6 / Batch 3 — explicit localhost LLM trigger + local OpenAI config v1`
+- Batch 2 Codex 产品实现 commit：`34aaa1b1d23fb5f7b729f006436ed4816f381dd3`
+- Batch 2 最终外部测试 head：`9e37abd303d34823f87e41ef1044df113ce2f0d6`
+- Batch 2 最终 CI run：`34134533838`
 - 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
 - 当前实现阻塞：无
 
@@ -33,76 +32,99 @@
 
 尚未整体验证：Capability 12–14。
 
-其中 Capability 12 已完成 provider-neutral foundation，但整体仍为 `IN_PROGRESS`。
+Capability 12 已完成 provider-neutral foundation 与 OpenAI Responses provider transport，但整体仍为 `IN_PROGRESS`。
 
 ## Phase 6 / Batch 1 验收
 
-Batch 1 建立了 provider-neutral structured LLM analysis foundation：
+Batch 1 建立并验证了：
 
 - `StructuredLlmProvider` 抽象；
 - 最小化 LLM input snapshot；
 - 完整 JD 与 authoritative upstream structured facts 输入边界；
 - prompt injection / delimiter 防线；
-- 固定 prompt version 与 output schema version；
+- 固定 prompt/output schema version；
 - exact-shape structured output validator；
-- full-JD substring evidence grounding；
-- deterministic / status / opportunity evidence-code grounding；
+- full-JD substring / upstream evidence grounding；
 - schema v8 `structured_llm_analyses`；
 - provider/model/source-state append-only history；
 - same-state idempotency；
 - provider call outside SQLite transaction；
 - source-change race rejection；
 - provider failure / invalid output / stored corruption fail closed；
-- missing complete JD 时不调用 provider；
-- `LocalDatabase` 只暴露 repository，不产生自动远程调用。
+- missing complete JD 时不调用 provider。
 
-本批没有真实 provider、API key、HTTP LLM endpoint、popup/UI 或自动调用。
+正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
+
+## Phase 6 / Batch 2 验收
+
+Codex 产品实现：
+
+`34aaa1b1d23fb5f7b729f006436ed4816f381dd3`
+
+外部测试 head：
+
+`9e37abd303d34823f87e41ef1044df113ce2f0d6`
+
+GitHub Actions run：
+
+`34134533838`
+
+Batch 2 新增并验证：
+
+- OpenAI Responses API concrete provider；
+- `providerId = openai`；
+- `gpt-5.6-luna` / `gpt-5.6-terra` / `gpt-5.6-sol` explicit allowlist；
+- API key 只作为 constructor secret 并只进入 Authorization header；
+- 固定 `https://api.openai.com/v1/responses`；
+- Node native fetch；
+- system / user prompt 分离；
+- `store:false` / `background:false` / `stream:false`；
+- reasoning low / `max_output_tokens = 4000`；
+- no tools / no conversation / no previous response / no user metadata；
+- Structured Outputs `json_schema` + `strict:true`；
+- completed-only single assistant `output_text` parsing；
+- reasoning item 隔离；
+- refusal / incomplete / failed / queued / malformed / non-2xx fail closed；
+- fixed generic provider errors；
+- 45 秒 timeout + AbortController；
+- zero retry / zero fallback。
 
 最终工程验证：
 
 - `npm ci`：PASS
 - `npm run typecheck`：PASS
 - `npm run lint`：PASS
-- `npm test`：PASS — **48 test files / 679 tests passed**
+- `npm test`：PASS — **49 test files / 697 tests passed**
 - `npm run build`：PASS
 - `npm run build:edge`：PASS
 - `npm run build:local`：PASS
 - `npm run verify:manifests`：PASS
 
-第一次全量 CI 暴露的失败全部是既有测试仍断言 schema v7 的测试基线漂移；外部网页版 ChatGPT 更新测试基线到 v8 后全量回归通过，没有发现需要 Codex 修复的 Batch 1 产品代码缺陷。
+第一次专项测试 CI 的唯一失败来自外部 timeout 测试 harness 晚挂接 rejection assertion；产品测试断言本身 697/697 通过。外部 ChatGPT 修复测试 harness 后未修改产品源码，最终 CI 全绿。
 
-正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
+本批没有真实 API key 环境加载、localhost LLM trigger、popup/UI 或真实远程请求，因此没有产生真实模型费用，也无需新的 BOSS 浏览器人工验收。
 
-## Phase 6 / Batch 2 方向
+正式记录：`docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
 
-下一批只接入第一个具体 provider transport：OpenAI Responses API。
+## Phase 6 / Batch 3 方向
 
-批准设计：
+下一批批准设计：
 
-`docs/decisions/ADR-0016-openai-structured-llm-provider-v1.md`
+`docs/decisions/ADR-0017-explicit-llm-trigger-and-local-config-v1.md`
 
-Batch 2 范围：
+目标是把已经验证的 OpenAI transport 接到**默认关闭、显式 opt-in、受保护的本地触发边界**：
 
-- OpenAI Responses API transport；
-- `providerId = openai`；
-- 显式模型 ID；
-- API key 只作为 provider constructor secret，不持久化、不记录；
-- Responses Structured Outputs `json_schema` + strict；
-- `store:false`、无 tools、无 background、无 conversation；
-- 固定 timeout；
-- 零 retry；
-- HTTP / refusal / incomplete / malformed output 统一 fail closed；
-- fake transport 外部测试。
+- 只读取产品专用 `BOSS_JOB_RADAR_OPENAI_API_KEY` + `BOSS_JOB_RADAR_OPENAI_MODEL`；
+- 两者都缺失时 feature disabled，本地服务照常启动；
+- partial/invalid config fail closed 且不泄露 secret；
+- runtime 接受可选 provider，不自行读取 env；
+- 新增受现有 bridge security 保护的 `POST /structured-llm-analyses`；
+- 请求只接受 exact canonical BOSS job URL；
+- local runtime 用 URL 查内部 Job，再调用现有 structured LLM repository；
+- HTTP 只返回最小 id / 固定错误，不返回 prompt、JD、key 或 OpenAI body；
+- startup/import/link/status/opportunity 等路径继续保持 0 provider calls。
 
-Batch 2 仍不做：
-
-- 从本地环境实际加载 API key；
-- localhost LLM endpoint；
-- browser trigger；
-- 真实远程模型验收；
-- Capability 13 UI。
-
-因此 Batch 2 即使 PASS，Capability 12 仍保持 `IN_PROGRESS`。后续还需要受控本地配置、显式用户触发链路和代表性脱敏真实模型评测，才能考虑 Capability 12 整体 `VERIFIED`。
+Batch 3 仍不做 popup analyze button、真实 OpenAI 请求、真实模型评测或 Capability 13 UI。因此 Batch 3 即使 PASS，Capability 12 仍保持 `IN_PROGRESS`。
 
 ## 协作与测试规则
 
