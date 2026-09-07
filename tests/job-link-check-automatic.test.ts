@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { openLocalDatabase } from '../src/local-service/database/database';
+import type { ImportRequest } from '../src/shared/import-request-types';
 import type { JobObservationInput } from '../src/shared/job-observation-types';
 
 const JOB_URL = 'https://www.zhipin.com/job_detail/status-example.html';
@@ -29,29 +30,61 @@ function detailObservation(overrides: Partial<JobObservationInput> = {}): JobObs
   };
 }
 
+function importRequest(
+  clientImportId: string,
+  pageType: 'search_results' | 'job_detail',
+  pageUrl: string,
+  capturedAt: string,
+  observations: JobObservationInput[],
+): ImportRequest {
+  return {
+    clientImportId,
+    source: {
+      pageType,
+      pageUrl,
+      capturedAt,
+      matchedCardCount: pageType === 'search_results' ? observations.length : null,
+      warnings: [],
+    },
+    observations,
+  };
+}
+
 describe('automatic available evidence from saved detail observations', () => {
-  it('records available once for a saved structured detail and replays idempotently by source observation', () => {
+  it('records available for a saved structured detail and replays idempotently by source observation', () => {
     const database = openLocalDatabase({ path: ':memory:' });
     try {
-      const request = {
-        clientImportId: '47f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
-        payloadSha256: 'a'.repeat(64),
-        pageType: 'job_detail' as const,
-        sourcePageUrl: JOB_URL,
-        capturedAt: '2026-09-07T08:00:00.000Z',
-        matchedCardCount: null,
-        extractionWarnings: [],
-        observations: [detailObservation()],
-      };
+      const request = importRequest(
+        '47f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
+        'job_detail',
+        JOB_URL,
+        '2026-09-07T08:00:00.000Z',
+        [detailObservation()],
+      );
       const imported = database.imports.importBatch(request);
       const jobId = database.observations.getById(imported.ids[0]!)!.jobId;
+      const first = database.statusAssessments.getLatestForJob(
+        jobId,
+        '2026-09-07T09:00:00.000Z',
+      );
 
-      database.linkChecks.appendAvailableForObservations(imported.ids);
-      database.linkChecks.appendAvailableForObservations(imported.ids);
-
-      expect(database.statusAssessments.getLatestForJob(jobId, '2026-09-07T09:00:00.000Z')).toMatchObject({
-        link: { status: 'available', markerCode: null, observedAt: '2026-09-07T08:00:00.000Z' },
+      expect(first).toMatchObject({
+        link: {
+          status: 'available',
+          markerCode: null,
+          observedAt: '2026-09-07T08:00:00.000Z',
+        },
       });
+      expect(first?.latestLinkCheckId).toEqual(expect.any(Number));
+
+      const replayed = database.imports.importBatch(request);
+      expect(replayed.ids).toEqual(imported.ids);
+      expect(
+        database.statusAssessments.getLatestForJob(
+          jobId,
+          '2026-09-07T09:30:00.000Z',
+        )?.latestLinkCheckId,
+      ).toBe(first?.latestLinkCheckId);
     } finally {
       database.close();
     }
@@ -61,30 +94,37 @@ describe('automatic available evidence from saved detail observations', () => {
     const database = openLocalDatabase({ path: ':memory:' });
     try {
       const searchUrl = 'https://www.zhipin.com/web/geek/jobs';
-      const search = database.imports.importBatch({
-        clientImportId: '57f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
-        payloadSha256: 'b'.repeat(64),
-        pageType: 'search_results',
-        sourcePageUrl: searchUrl,
-        capturedAt: '2026-09-07T08:00:00.000Z',
-        matchedCardCount: 1,
-        extractionWarnings: [],
-        observations: [detailObservation({ pageType: 'search_results', sourcePageUrl: searchUrl, fullJdText: null })],
-      });
-      const empty = database.imports.importBatch({
-        clientImportId: '67f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
-        payloadSha256: 'c'.repeat(64),
-        pageType: 'job_detail',
-        sourcePageUrl: JOB_URL,
-        capturedAt: '2026-09-07T09:00:00.000Z',
-        matchedCardCount: null,
-        extractionWarnings: [],
-        observations: [detailObservation({ capturedAt: '2026-09-07T09:00:00.000Z', title: null, fullJdText: null })],
-      });
+      const search = database.imports.importBatch(importRequest(
+        '57f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
+        'search_results',
+        searchUrl,
+        '2026-09-07T08:00:00.000Z',
+        [detailObservation({
+          pageType: 'search_results',
+          sourcePageUrl: searchUrl,
+          fullJdText: null,
+        })],
+      ));
+      const empty = database.imports.importBatch(importRequest(
+        '67f3bb11-be51-4d5f-9dbb-e48ec5f408fd',
+        'job_detail',
+        JOB_URL,
+        '2026-09-07T09:00:00.000Z',
+        [detailObservation({
+          capturedAt: '2026-09-07T09:00:00.000Z',
+          title: null,
+          fullJdText: null,
+        })],
+      ));
 
-      database.linkChecks.appendAvailableForObservations([...search.ids, ...empty.ids]);
+      expect(search.ids).toHaveLength(1);
       const jobId = database.observations.getById(empty.ids[0]!)!.jobId;
-      expect(database.statusAssessments.getLatestForJob(jobId, '2026-09-07T10:00:00.000Z')?.link.status).toBe('unchecked');
+      expect(
+        database.statusAssessments.getLatestForJob(
+          jobId,
+          '2026-09-07T10:00:00.000Z',
+        )?.link.status,
+      ).toBe('unchecked');
     } finally {
       database.close();
     }
