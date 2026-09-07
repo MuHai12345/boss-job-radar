@@ -1,6 +1,6 @@
 # ADR-0017：Explicit Structured LLM Trigger + Local OpenAI Config v1
 
-- 状态：Phase 6 / Batch 3 设计已批准，等待 Codex 实现
+- 状态：Phase 6 / Batch 3 已实现并通过外部验收
 - 日期：2026-09-07
 - 对应能力：Capability 12 — structured LLM analysis
 - 前置：Phase 6 / Batch 1 provider-neutral foundation、Batch 2 OpenAI Responses transport 均已通过外部验收
@@ -60,7 +60,7 @@ provider 的存在**不等于调用**。startup 只保存依赖，不允许执�
 
 ## 显式分析请求
 
-新增共享请求 contract，建议：
+新增共享请求 contract：
 
 `src/shared/structured-llm-analysis-request.ts`
 
@@ -102,19 +102,7 @@ provider 的存在**不等于调用**。startup 只保存依赖，不允许执�
 
 ## Runtime writer
 
-server 不直接访问 SQLite 或 OpenAI provider。新增一个窄接口，例如：
-
-```ts
-interface StructuredLlmAnalysisWriter {
-  analyzeJobUrl(jobUrl: string): Promise<
-    | { status: 'created'; id: number }
-    | { status: 'job_not_found' }
-    | { status: 'analysis_unavailable' }
-  >;
-}
-```
-
-具体命名可调整，但职责必须保持：
+server 不直接访问 SQLite 或 OpenAI provider。使用窄 `StructuredLlmAnalysisWriter`：
 
 1. 用 `database.jobs.findByJobUrl(jobUrl)` 查内部 Job；
 2. 找不到 → `job_not_found`，不调用 provider；
@@ -127,7 +115,7 @@ interface StructuredLlmAnalysisWriter {
 
 ## HTTP response contract
 
-建议固定：
+固定：
 
 - provider 未配置：`503 { "error": "analysis_not_configured" }`
 - invalid request：`400 { "error": "invalid_request" }`
@@ -136,13 +124,13 @@ interface StructuredLlmAnalysisWriter {
 - success：`200 { "id": <positive integer> }`
 - provider / invalid output / source race / persistence failure：`502 { "error": "analysis_failed" }`
 
-不要把底层 `Structured LLM provider failed`、OpenAI body、HTTP status text、request id、prompt、JD 或 key返回给客户端。
+不要把底层 `Structured LLM provider failed`、OpenAI body、HTTP status text、request id、prompt、JD 或 key 返回给客户端。
 
 same provider/model/source state 已有的 repository idempotency 继续生效；再次显式触发相同状态可以返回同一个 persisted id，但不得因此绕过 bridge security。
 
 ## 费用边界
 
-Batch 3 必须保持：
+Batch 3 保持：
 
 - startup：0 calls；
 - database open：0 calls；
@@ -152,19 +140,13 @@ Batch 3 必须保持：
 - health/session：0 calls；
 - 只有通过受保护 `POST /structured-llm-analyses` 明确请求时才允许 0 或 1 次 provider call。
 
-如果 Job 不存在、缺完整 JD、已有 same-state analysis，则应由现有 repository 逻辑避免不必要 provider call。
+如果 Job 不存在、缺完整 JD、已有 same-state analysis，则由现有 repository 逻辑避免不必要 provider call。
 
 ## Secret / logging
 
-`main.ts` 的 startup error sanitization 必须继续保护敏感信息。OpenAI key 应加入本轮敏感值防泄露边界，但不能打印、hash、截断后打印或写入诊断。
+`main.ts` 的 startup error sanitization 继续保护敏感信息。OpenAI key 被加入敏感值防泄露边界，但不能打印、hash、截断后打印或写入诊断。
 
-成功启动日志不得显示：
-
-- key；
-- key 是否以某前缀开头；
-- model 配置原始环境字符串之外的 secret 信息。
-
-可以只输出非敏感 feature 状态，例如是否配置，但不是本批必需；默认优先不新增日志。
+成功启动日志不得显示 key、key prefix/suffix/hash。
 
 ## 非目标
 
@@ -186,19 +168,37 @@ Batch 3 不做：
 
 ## 外部验收
 
-Codex 仍只写产品代码，不写或运行测试。
-
-外部网页版 ChatGPT 将独立覆盖：
+外部网页版 ChatGPT 已独立验证：
 
 - config disabled / complete / partial / invalid secret / invalid model；
-- key 不进入错误、日志、HTTP response 或数据库；
-- runtime startup / database open / import 等 0 provider calls；
+- key startup-error sanitization；
+- runtime startup / database open / import / link / status / opportunity / health / session 均 0 provider calls；
 - protected endpoint 的 Host / Origin / token / content type / encoding / body-limit；
 - exact canonical job URL request；
 - provider not configured / job not found / missing JD / success / generic failure；
 - same-state repeated explicit trigger idempotency；
 - fake provider call count；
-- provider failure / invalid output / source race HTTP error hygiene；
+- invalid output HTTP error hygiene；
 - complete existing regression suite。
 
-Batch 3 即使通过，Capability 12 仍保持 `IN_PROGRESS`。后续还需要浏览器上的显式用户触发动作，以及用户明确同意后的代表性真实 OpenAI 模型评测，才能考虑整体验收。
+最终外部验收记录：
+
+`docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
+
+Codex 产品实现 commit：
+
+`95ecbed47598378cb402a89757bf17d9e8327c64`
+
+最终外部测试 head：
+
+`ee82ee52c24763470cfdf6f2de9504e139989405`
+
+最终 CI run：
+
+`34137913888`
+
+最终结果：**50 test files / 714 tests passed**，typecheck、lint、Chrome/Edge build、local build、manifest verification 全部 PASS。
+
+Batch 3 结论：`PASS`。
+
+Capability 12 仍保持 `IN_PROGRESS`。后续还需要浏览器上的显式用户触发动作，以及用户明确同意后的代表性真实 OpenAI 模型评测，才能考虑整体验收。
