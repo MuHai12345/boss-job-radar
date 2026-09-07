@@ -255,6 +255,7 @@ describe('job observation repository', () => {
         { name: 'create_deterministic_job_analyses', version: 4 },
         { name: 'create_search_run_salary_decoding', version: 5 },
         { name: 'create_job_status_tracking', version: 6 },
+        { name: 'create_job_opportunity_assessments', version: 7 },
       ]);
       expect(
         inspectionConnection
