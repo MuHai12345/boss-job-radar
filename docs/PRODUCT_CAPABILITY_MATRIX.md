@@ -5,7 +5,7 @@
 | 状态 | 含义 |
 | --- | --- |
 | `NOT_STARTED` | 尚未开始实现 |
-| `IN_PROGRESS` | 正在实现，尚未形成可审阅结果 |
+| `IN_PROGRESS` | 正在实现，尚未形成完整能力验收 |
 | `IMPLEMENTED_AWAITING_REVIEW` | 实现已完成，等待外部独立审阅与验收 |
 | `VERIFIED` | 已通过外部独立审阅与验收 |
 | `DEFERRED` | 已明确延期，后续补充验证 |
@@ -26,12 +26,12 @@
 | 9 | 经验硬门槛 / 偏好 / 矛盾识别 | `VERIFIED` |
 | 10 | 招聘者活跃 / 新鲜度 / link 状态判断 | `VERIFIED` |
 | 11 | 成长性 / 转行价值 / 风险 / 优先级 / 面试追问 | `VERIFIED` |
-| 12 | structured LLM analysis | `NOT_STARTED` |
+| 12 | structured LLM analysis | `IN_PROGRESS` |
 | 13 | 本地岗位审核 UI + 用户审核/投递状态 | `NOT_STARTED` |
 | 14 | 搜索覆盖统计 / 稳定性 / backup recovery | `NOT_STARTED` |
 | 15 | 列表薪资 PUA 可信解码与正式产品链路接入 | `VERIFIED` |
 
-核心能力共 15 项：**12 项 `VERIFIED`，3 项 `NOT_STARTED`**。
+核心能力共 15 项：**12 项 `VERIFIED`，1 项 `IN_PROGRESS`，2 项 `NOT_STARTED`**。
 
 ## 当前验收快照
 
@@ -41,8 +41,11 @@
 - Phase 5 / Batch 3：`PASS`（招聘者活跃、平台新鲜度、local observation recency、岗位 link 状态）
 - Phase 5 / Batch 4：`PASS`（成长性、转行价值、风险、当前机会优先级、面试追问）
 - Phase 5：`PASS`
-- 下一阶段：Phase 6 / Capability 12 structured LLM analysis。
+- Phase 6 / Batch 1：`PASS`（provider-neutral structured LLM analysis foundation）
+- Phase 6：`IN_PROGRESS`
 
-Phase 5 / Batch 3 的正式外部验收依据记录在 `docs/verification/2026-09-07-phase-5-batch-3-external-verification.md`。
+Phase 6 / Batch 1 已验证：最小输入快照、prompt-injection boundary、strict structured output validation、evidence grounding、schema v8、provider/model/source-state persistence、provider-call idempotency、source-change race、transaction boundary 和失败语义。
 
-Phase 5 / Batch 4 的正式外部验收依据记录在 `docs/verification/2026-09-07-phase-5-batch-4-external-verification.md`。Batch 4 没有新增浏览器 UI / DOM 行为，因此无需额外真实 BOSS 浏览器点击验收。
+本批没有接入真实 provider，因此 Capability 12 不提前标记 `VERIFIED`。下一批为 OpenAI Responses provider transport；之后仍需受控本地配置、显式用户触发和代表性脱敏真实模型评测。
+
+正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`。
