@@ -52,11 +52,11 @@ function createObservation(
 }
 
 describe('SQLite migrations', () => {
-  it('applies schema version 7 to a fresh database and records every migration', () => {
+  it('applies schema version 8 to a fresh database and records every migration', () => {
     const database = new SqliteDatabase(':memory:');
     try {
       runMigrations(database);
-      expect(CURRENT_SCHEMA_VERSION).toBe(7);
+      expect(CURRENT_SCHEMA_VERSION).toBe(8);
       expect(
         database.prepare(
           'SELECT version, name FROM schema_migrations ORDER BY version',
@@ -69,11 +69,12 @@ describe('SQLite migrations', () => {
         { name: 'create_search_run_salary_decoding', version: 5 },
         { name: 'create_job_status_tracking', version: 6 },
         { name: 'create_job_opportunity_assessments', version: 7 },
+        { name: 'create_structured_llm_analyses', version: 8 },
       ]);
       const appliedAt = database.prepare(
         'SELECT applied_at FROM schema_migrations ORDER BY version',
       ).all() as Array<{ applied_at: string }>;
-      expect(appliedAt).toHaveLength(7);
+      expect(appliedAt).toHaveLength(8);
       for (const row of appliedAt) {
         expect(row.applied_at).toMatch(
           /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
@@ -117,11 +118,11 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (8, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (9, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 8 is newer than supported version 7',
+        'Database schema version 9 is newer than supported version 8',
       );
       expect(
         database.prepare(
