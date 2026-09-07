@@ -503,7 +503,7 @@ describe('structured LLM runtime explicit trigger integration', () => {
 
       const input = observation();
       const imported = runtime.database.imports.importBatch({
-        clientImportId: `runtime-llm-${Date.now()}`,
+        clientImportId: '123e4567-e89b-42d3-a456-426614174000',
         source: {
           pageType: 'job_detail',
           pageUrl: JOB_URL,
