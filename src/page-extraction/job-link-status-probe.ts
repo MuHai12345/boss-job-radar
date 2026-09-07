@@ -71,7 +71,7 @@ export function runJobLinkStatusProbe(expectedJobUrl: string): JobLinkStatusProb
     if (element.tagName === 'IFRAME') return unknown;
     const text = shortVisibleText(element);
     if (text === null || text === '') continue;
-    if (/验证码|安全验证|异常访问|访问异常|访问受限|访问频繁|操作频繁|人机验证|滑动验证|拖动滑块|请.*登录|需要登录|登录后|登录验证|扫码登录|账号登录|登录[\/或]?注册/u.test(text)) return unknown;
+    if (/验证码|安全验证|异常访问|访问异常|访问受限|访问频繁|操作频繁|人机验证|滑动验证|拖动滑块|请.*登录|需要登录|登录后|登录验证|扫码登录|账号登录|登录[/或]?注册/u.test(text)) return unknown;
     // Exact approved message, with optional final punctuation. A mention inside
     // JD prose or a negated phrase is never classified as an unavailable page.
     const marker = markers[text.replace(/[。！!，,：:]+$/u, '')];
