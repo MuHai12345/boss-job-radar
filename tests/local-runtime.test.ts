@@ -65,7 +65,7 @@ function sendHealthRequest(port: number): Promise<{
 }
 
 describe('local runtime lifecycle', () => {
-  it('creates a SQLite database with schema migration version 6', async () => {
+  it('creates a SQLite database with schema migration version 7', async () => {
     const databasePath = await createTemporaryDatabasePath();
     const runtime = await startLocalRuntime({ databasePath, port: 0 });
 
@@ -74,7 +74,7 @@ describe('local runtime lifecycle', () => {
         readonly: true,
       });
       try {
-        expect(CURRENT_SCHEMA_VERSION).toBe(6);
+        expect(CURRENT_SCHEMA_VERSION).toBe(7);
         expect(
           inspectionConnection
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
@@ -86,6 +86,7 @@ describe('local runtime lifecycle', () => {
           { version: 4 },
           { version: 5 },
           { version: 6 },
+          { version: 7 },
         ]);
       } finally {
         inspectionConnection.close();
@@ -123,7 +124,7 @@ describe('local runtime lifecycle', () => {
     await runtime.close();
 
     await expect(
-      sendHealthRequest(runtime.address.port),
+      sendHealthRequest(runtime.address.port, 'GET', '/health'),
     ).rejects.toMatchObject({ code: 'ECONNREFUSED' });
     expect(() => runtime.database.isForeignKeyEnforcementEnabled()).toThrow();
   });
