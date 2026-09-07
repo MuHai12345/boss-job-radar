@@ -3,7 +3,7 @@ import type { StructuredLlmProvider, StructuredLlmProviderRequest } from './stru
 
 export const OPENAI_STRUCTURED_LLM_TIMEOUT_MS = 45_000;
 const ENDPOINT = 'https://api.openai.com/v1/responses';
-const MODEL_IDS = ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol'] as const;
+export const OPENAI_STRUCTURED_LLM_MODEL_IDS = Object.freeze(['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol'] as const);
 
 export interface OpenAiStructuredLlmProviderOptions {
   readonly apiKey: string;
@@ -61,7 +61,7 @@ export function createOpenAiStructuredLlmProvider(options: OpenAiStructuredLlmPr
   try {
     const { apiKey, modelId, fetchImpl = globalThis.fetch } = options;
     if (typeof apiKey !== 'string' || apiKey.trim().length === 0 || /\p{Cc}/u.test(apiKey)
-      || typeof modelId !== 'string' || !MODEL_IDS.some((allowed) => allowed === modelId)
+      || typeof modelId !== 'string' || !OPENAI_STRUCTURED_LLM_MODEL_IDS.some((allowed) => allowed === modelId)
       || typeof fetchImpl !== 'function') {
       throw new Error();
     }

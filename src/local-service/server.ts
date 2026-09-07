@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import type { ImportRequest } from '../shared/import-request-types.js';
+import { validateStructuredLlmAnalysisRequest } from '../shared/structured-llm-analysis-request.js';
 import { validateJobLinkCheckRequest, type JobLinkCheckRequest } from '../shared/job-link-check-types.js';
 import { ImportConflictError } from './database/import-repository.js';
 import {
@@ -23,6 +24,7 @@ const HEALTH_PATH = '/health';
 const BRIDGE_SESSION_PATH = '/bridge/session';
 const OBSERVATIONS_PATH = '/observations';
 const JOB_LINK_CHECKS_PATH = '/job-link-checks';
+const STRUCTURED_LLM_ANALYSES_PATH = '/structured-llm-analyses';
 const HEALTH_RESPONSE_BODY = JSON.stringify({
   status: 'ok',
   service: 'boss-job-radar-local',
@@ -45,6 +47,14 @@ export interface ImportBatchWriter {
 
 export interface JobLinkCheckWriter {
   append(request: JobLinkCheckRequest): { id: number } | null;
+}
+
+export interface StructuredLlmAnalysisWriter {
+  analyzeJobUrl(jobUrl: string): Promise<
+    | { readonly status: 'ok'; readonly id: number }
+    | { readonly status: 'job_not_found' }
+    | { readonly status: 'analysis_unavailable' }
+  >;
 }
 
 function sendJson(
@@ -89,6 +99,7 @@ async function handleProtectedWriteRequest(
   token: string,
   imports: ImportBatchWriter,
   linkChecks: JobLinkCheckWriter | undefined,
+  structuredLlmAnalyses: StructuredLlmAnalysisWriter | undefined,
 ): Promise<void> {
   if (!hasExpectedLoopbackHost(request)) {
     rejectWithoutReadingBody(request, response, 403, 'forbidden');
@@ -143,6 +154,33 @@ async function handleProtectedWriteRequest(
     return;
   }
 
+  if (request.url === STRUCTURED_LLM_ANALYSES_PATH) {
+    const analysisRequest = validateStructuredLlmAnalysisRequest(body);
+    if (analysisRequest === null) {
+      sendJson(response, 400, { error: 'invalid_request' });
+      return;
+    }
+    if (structuredLlmAnalyses === undefined) {
+      sendJson(response, 503, { error: 'analysis_not_configured' });
+      return;
+    }
+    try {
+      const result = await structuredLlmAnalyses.analyzeJobUrl(analysisRequest.jobUrl);
+      if (result.status === 'job_not_found') {
+        sendJson(response, 404, { error: 'job_not_found' });
+      } else if (result.status === 'analysis_unavailable') {
+        sendJson(response, 422, { error: 'analysis_unavailable' });
+      } else if (result.status === 'ok' && Number.isSafeInteger(result.id) && result.id > 0) {
+        sendJson(response, 200, { id: result.id });
+      } else {
+        sendJson(response, 502, { error: 'analysis_failed' });
+      }
+    } catch {
+      sendJson(response, 502, { error: 'analysis_failed' });
+    }
+    return;
+  }
+
   if (request.url === JOB_LINK_CHECKS_PATH) {
     const linkRequest = validateJobLinkCheckRequest(body);
     if (linkRequest === null) {
@@ -184,6 +222,7 @@ async function handleRequest(
   token: string,
   imports: ImportBatchWriter,
   linkChecks: JobLinkCheckWriter | undefined,
+  structuredLlmAnalyses: StructuredLlmAnalysisWriter | undefined,
 ): Promise<void> {
   if (request.url === HEALTH_PATH) {
     handleHealthRequest(request, response);
@@ -208,13 +247,15 @@ async function handleRequest(
     return;
   }
 
-  if (request.url === OBSERVATIONS_PATH || request.url === JOB_LINK_CHECKS_PATH) {
+  if (request.url === OBSERVATIONS_PATH || request.url === JOB_LINK_CHECKS_PATH
+    || request.url === STRUCTURED_LLM_ANALYSES_PATH) {
     await handleProtectedWriteRequest(
       request,
       response,
       token,
       imports,
       linkChecks,
+      structuredLlmAnalyses,
     );
     return;
   }
@@ -226,6 +267,7 @@ async function handleRequest(
 export async function startLocalService(options: {
   readonly imports: ImportBatchWriter;
   readonly linkChecks?: JobLinkCheckWriter;
+  readonly structuredLlmAnalyses?: StructuredLlmAnalysisWriter;
   readonly port: number;
 }): Promise<LocalService> {
   const token = createBridgeSessionToken();
@@ -236,6 +278,7 @@ export async function startLocalService(options: {
       token,
       options.imports,
       options.linkChecks,
+      options.structuredLlmAnalyses,
     ).catch(() => {
       if (!response.headersSent) {
         sendJson(response, 500, { error: 'internal_error' });

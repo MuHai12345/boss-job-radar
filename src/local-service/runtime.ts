@@ -1,3 +1,4 @@
+import type { StructuredLlmProvider } from '../domain/llm/structured-llm-provider.js';
 import {
   openLocalDatabase,
   type LocalDatabase,
@@ -10,6 +11,7 @@ import {
   startLocalService,
   type LocalService,
   type LocalServiceAddress,
+  type StructuredLlmAnalysisWriter,
 } from './server.js';
 
 export interface LocalRuntime {
@@ -21,15 +23,29 @@ export interface LocalRuntime {
 export async function startLocalRuntime(options: {
   readonly databasePath: string;
   readonly port: number;
+  readonly structuredLlmProvider?: StructuredLlmProvider;
 }): Promise<LocalRuntime> {
   const database = openLocalDatabase({ path: options.databasePath });
 
   let service: LocalService;
   try {
+    const provider = options.structuredLlmProvider;
+    const structuredLlmAnalyses: StructuredLlmAnalysisWriter | undefined = provider === undefined
+      ? undefined
+      : {
+          async analyzeJobUrl(jobUrl) {
+            const job = database.jobs.findByJobUrl(jobUrl);
+            if (job === null) return { status: 'job_not_found' };
+            const persisted = await database.structuredLlmAnalyses.analyzeJob(job.id, provider);
+            if (persisted === null) return { status: 'analysis_unavailable' };
+            return { status: 'ok', id: persisted.id };
+          },
+        };
     service = await startLocalService({
       imports: database.imports,
       linkChecks: database.linkChecks,
       port: options.port,
+      ...(structuredLlmAnalyses === undefined ? {} : { structuredLlmAnalyses }),
     });
   } catch (error) {
     database.close();
