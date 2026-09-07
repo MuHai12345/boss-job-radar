@@ -1,6 +1,6 @@
 # ADR-0016：OpenAI Structured LLM Provider Transport v1
 
-- 状态：Phase 6 / Batch 2 设计已批准，等待 Codex 实现
+- 状态：Phase 6 / Batch 2 已实现并通过外部验收
 - 日期：2026-09-07
 - 对应能力：Capability 12 — structured LLM analysis
 - 前置：Phase 6 / Batch 1 provider-neutral foundation 已通过外部验收
@@ -60,7 +60,7 @@ provider 构造配置显式接收 `apiKey`，但：
 - 不进入 request body；
 - 只用于 HTTPS `Authorization: Bearer ...` header。
 
-真正从 `OPENAI_API_KEY` 或其他本地安全配置加载 key 的 wiring 属于下一批。本批只是 transport constructor boundary。
+真正从产品专用本地安全配置加载 key 的 wiring 属于下一批。本批只是 transport constructor boundary。
 
 ## Transport
 
@@ -87,7 +87,7 @@ provider 构造配置显式接收 `apiKey`，但：
 - 不带 conversation
 - 不带 user/account tracking metadata
 - reasoning effort 固定为 `low`
-- `max_output_tokens` 使用固定有界值，v1 建议 `4000`
+- `max_output_tokens` 使用固定有界值 `4000`
 
 provider-neutral request 中的：
 
@@ -224,7 +224,7 @@ Batch 2 不修改以下路径去调用 OpenAI：
 
 Codex 仍只写产品代码，不写或运行测试。
 
-外部网页版 ChatGPT 将使用 fake fetch / fake HTTP responses 独立覆盖：
+外部网页版 ChatGPT 使用 fake fetch / fake HTTP responses 独立覆盖：
 
 - exact endpoint / method / headers；
 - key 仅存在于 Authorization header；
@@ -241,6 +241,10 @@ Codex 仍只写产品代码，不写或运行测试。
 - fixed generic errors；
 - full existing CI regression。
 
-Batch 2 即使通过，也只代表 OpenAI transport 的代码 contract 通过；Capability 12 仍保持 `IN_PROGRESS`。
+最终外部验收记录：
 
-下一批才批准本地 key/model 配置、显式用户触发链路，并在用户明确同意远程发送脱敏岗位数据和 API 成本后执行代表性真实模型评测。
+`docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
+
+Batch 2 结论：`PASS`。
+
+这只代表 OpenAI transport 的代码 contract 已验证；Capability 12 仍保持 `IN_PROGRESS`。下一批批准本地 key/model 配置与显式 localhost 触发链路；浏览器显式用户动作和代表性真实模型评测继续放在后续批次。
