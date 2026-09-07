@@ -1,4 +1,6 @@
 import type SqliteDatabase from 'better-sqlite3';
+import { createJobOpportunityAssessmentRepository } from './job-opportunity-assessment-repository.js';
+import { refreshJobOpportunitySafely } from '../job-opportunity-refresh.js';
 import { createJobLinkCheckRepository } from './job-link-check-repository.js';
 import { createJobStatusAssessmentRepository } from './job-status-assessment-repository.js';
 import { refreshJobStatusSafely } from '../job-status-refresh.js';
@@ -150,6 +152,10 @@ export function createImportRepository(
       refreshJobStatusSafely(() => {
         const jobIds = ids.map((id) => (database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number }).job_id);
         createJobStatusAssessmentRepository(database).refreshAffectedByJobs(jobIds);
+      });
+      refreshJobOpportunitySafely(() => {
+        const jobIds = new Set(ids.map((id) => (database.prepare('SELECT job_id FROM job_observations WHERE id = ?').get(id) as { job_id: number }).job_id));
+        createJobOpportunityAssessmentRepository(database).refreshAffectedByJobs([...jobIds]);
       });
       return { ids };
     },

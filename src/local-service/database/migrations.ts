@@ -393,9 +393,34 @@ const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    name: 'create_job_opportunity_assessments',
+    up(database) {
+      database.exec(`
+        CREATE TABLE job_opportunity_assessments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          rules_version TEXT NOT NULL,
+          latest_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          jd_observation_id INTEGER NULL REFERENCES job_observations(id),
+          latest_link_check_id INTEGER NULL REFERENCES job_link_checks(id),
+          source_state_key TEXT NOT NULL,
+          growth_band TEXT NOT NULL CHECK (growth_band IN ('strong', 'moderate', 'limited', 'unknown')),
+          career_switch_status TEXT NOT NULL CHECK (career_switch_status IN (
+            'suitable', 'worth_trying', 'hard_mismatch', 'unclear'
+          )),
+          priority_tier TEXT NOT NULL CHECK (priority_tier IN ('S', 'A', 'B', 'C', 'REVIEW')),
+          assessment_json TEXT NOT NULL,
+          assessed_at TEXT NOT NULL,
+          UNIQUE (job_id, rules_version, source_state_key)
+        );
+      `);
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 interface MaximumVersionRow {
   readonly version: number | null;

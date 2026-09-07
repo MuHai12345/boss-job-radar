@@ -1,4 +1,6 @@
 import type SqliteDatabase from 'better-sqlite3';
+import { createJobOpportunityAssessmentRepository } from './job-opportunity-assessment-repository.js';
+import { refreshJobOpportunitySafely } from '../job-opportunity-refresh.js';
 import { canonicalCheckableJobUrl, validateJobLinkCheckRequest, type JobLinkCheckRequest } from '../../shared/job-link-check-types.js';
 import { refreshJobStatusSafely } from '../job-status-refresh.js';
 import { createJobStatusAssessmentRepository } from './job-status-assessment-repository.js';
@@ -34,6 +36,7 @@ export function createJobLinkCheckRepository(database: SqliteDatabase.Database):
       if (result === null) return null;
       // The link fact is committed before touching the derived assessment.
       refreshJobStatusSafely(() => createJobStatusAssessmentRepository(database).assessJob(result.jobId));
+      refreshJobOpportunitySafely(() => createJobOpportunityAssessmentRepository(database).assessJob(result.jobId));
       return { id: result.id };
     },
     appendAvailableForObservations(observationIds) {
