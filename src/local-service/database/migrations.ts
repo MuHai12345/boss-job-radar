@@ -418,9 +418,35 @@ const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    name: 'create_structured_llm_analyses',
+    up(database) {
+      database.exec(`
+        CREATE TABLE structured_llm_analyses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id),
+          prompt_version TEXT NOT NULL,
+          output_schema_version TEXT NOT NULL,
+          provider_id TEXT NOT NULL CHECK (length(provider_id) BETWEEN 1 AND 120),
+          model_id TEXT NOT NULL CHECK (length(model_id) BETWEEN 1 AND 120),
+          latest_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          jd_observation_id INTEGER NOT NULL REFERENCES job_observations(id),
+          source_state_key TEXT NOT NULL,
+          analysis_json TEXT NOT NULL,
+          analyzed_at TEXT NOT NULL,
+          UNIQUE (job_id, prompt_version, output_schema_version, provider_id, model_id, source_state_key)
+        );
+        CREATE INDEX idx_structured_llm_analyses_current
+        ON structured_llm_analyses (
+          job_id, prompt_version, output_schema_version, provider_id, model_id, source_state_key, id DESC
+        );
+      `);
+    },
+  },
 ];
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 interface MaximumVersionRow {
   readonly version: number | null;

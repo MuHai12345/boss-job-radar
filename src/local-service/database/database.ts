@@ -1,4 +1,5 @@
 import SqliteDatabase from 'better-sqlite3';
+import { createStructuredLlmAnalysisRepository, type StructuredLlmAnalysisRepository } from './structured-llm-analysis-repository.js';
 import { createJobOpportunityAssessmentRepository, type JobOpportunityAssessmentRepository } from './job-opportunity-assessment-repository.js';
 import { createJobLinkCheckRepository, type JobLinkCheckRepository } from './job-link-check-repository.js';
 import { createJobStatusAssessmentRepository, type JobStatusAssessmentRepository } from './job-status-assessment-repository.js';
@@ -20,6 +21,7 @@ import {
 } from './import-repository.js';
 
 export interface LocalDatabase {
+  readonly structuredLlmAnalyses: StructuredLlmAnalysisRepository;
   readonly opportunities: JobOpportunityAssessmentRepository;
   readonly linkChecks: JobLinkCheckRepository;
   readonly statusAssessments: JobStatusAssessmentRepository;
@@ -44,6 +46,7 @@ export function openLocalDatabase(options: {
   let linkChecks: JobLinkCheckRepository;
   let statusAssessments: JobStatusAssessmentRepository;
   let opportunities: JobOpportunityAssessmentRepository;
+  let structuredLlmAnalyses: StructuredLlmAnalysisRepository;
 
   try {
     database.pragma('foreign_keys = ON');
@@ -56,6 +59,7 @@ export function openLocalDatabase(options: {
     linkChecks = createJobLinkCheckRepository(database);
     statusAssessments = createJobStatusAssessmentRepository(database);
     opportunities = createJobOpportunityAssessmentRepository(database);
+    structuredLlmAnalyses = createStructuredLlmAnalysisRepository(database);
   } catch (error) {
     database.close();
     throw error;
@@ -63,6 +67,7 @@ export function openLocalDatabase(options: {
 
   let closed = false;
   return {
+    structuredLlmAnalyses,
     opportunities,
     linkChecks,
     statusAssessments,
