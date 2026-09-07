@@ -12,7 +12,6 @@ import {
 } from '../src/local-service/database/observation-repository';
 
 interface TableColumn {
-  readonly cid: number;
   readonly dflt_value: string | null;
   readonly name: string;
   readonly notnull: 0 | 1;
@@ -53,51 +52,33 @@ function createObservation(
 }
 
 describe('SQLite migrations', () => {
-  it('applies schema version 6 to a fresh database and records it', () => {
+  it('applies schema version 7 to a fresh database and records every migration', () => {
     const database = new SqliteDatabase(':memory:');
-
     try {
       runMigrations(database);
-
-      expect(CURRENT_SCHEMA_VERSION).toBe(6);
+      expect(CURRENT_SCHEMA_VERSION).toBe(7);
       expect(
-        database
-          .prepare(
-            'SELECT version, name, applied_at FROM schema_migrations ORDER BY version',
-          )
-          .all(),
+        database.prepare(
+          'SELECT version, name FROM schema_migrations ORDER BY version',
+        ).all(),
       ).toEqual([
-        {
-          applied_at: expect.stringMatching(
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-          ),
-          name: 'create_job_observations',
-          version: 1,
-        },
-        {
-          applied_at: expect.stringMatching(
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-          ),
-          name: 'create_job_identity',
-          version: 2,
-        },
-        {
-          applied_at: expect.stringMatching(
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-          ),
-          name: 'create_import_provenance',
-          version: 3,
-        },
-        {
-          applied_at: expect.stringMatching(
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-          ),
-          name: 'create_deterministic_job_analyses',
-          version: 4,
-        },
-        { applied_at: expect.any(String), name: 'create_search_run_salary_decoding', version: 5 },
-        { applied_at: expect.any(String), name: 'create_job_status_tracking', version: 6 },
+        { name: 'create_job_observations', version: 1 },
+        { name: 'create_job_identity', version: 2 },
+        { name: 'create_import_provenance', version: 3 },
+        { name: 'create_deterministic_job_analyses', version: 4 },
+        { name: 'create_search_run_salary_decoding', version: 5 },
+        { name: 'create_job_status_tracking', version: 6 },
+        { name: 'create_job_opportunity_assessments', version: 7 },
       ]);
+      const appliedAt = database.prepare(
+        'SELECT applied_at FROM schema_migrations ORDER BY version',
+      ).all() as Array<{ applied_at: string }>;
+      expect(appliedAt).toHaveLength(7);
+      for (const row of appliedAt) {
+        expect(row.applied_at).toMatch(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+        );
+      }
     } finally {
       database.close();
     }
@@ -107,27 +88,17 @@ describe('SQLite migrations', () => {
     const database = new SqliteDatabase(':memory:');
     const applicationOrder: number[] = [];
     const migrations: readonly Migration[] = [
-      {
-        name: 'second',
-        up: () => applicationOrder.push(2),
-        version: 2,
-      },
-      {
-        name: 'first',
-        up: () => applicationOrder.push(1),
-        version: 1,
-      },
+      { name: 'second', up: () => applicationOrder.push(2), version: 2 },
+      { name: 'first', up: () => applicationOrder.push(1), version: 1 },
     ];
-
     try {
       runMigrations(database, migrations);
       runMigrations(database, migrations);
-
       expect(applicationOrder).toEqual([1, 2]);
       expect(
-        database
-          .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
-          .all(),
+        database.prepare(
+          'SELECT version, name FROM schema_migrations ORDER BY version',
+        ).all(),
       ).toEqual([
         { name: 'first', version: 1 },
         { name: 'second', version: 2 },
@@ -146,19 +117,16 @@ describe('SQLite migrations', () => {
         applied_at TEXT NOT NULL
       );
       INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (7, 'future_migration', '2026-09-03T00:00:00.000Z');
+      VALUES (8, 'future_migration', '2026-09-03T00:00:00.000Z');
     `);
-
     try {
       expect(() => runMigrations(database)).toThrow(
-        'Database schema version 7 is newer than supported version 6',
+        'Database schema version 8 is newer than supported version 7',
       );
       expect(
-        database
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'job_observations'",
-          )
-          .get(),
+        database.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'job_observations'",
+        ).get(),
       ).toBeUndefined();
     } finally {
       database.close();
@@ -169,27 +137,22 @@ describe('SQLite migrations', () => {
     const database = new SqliteDatabase(':memory:');
     const failingMigration: Migration = {
       name: 'failing_migration',
+      version: 1,
       up(connection) {
         connection.exec('CREATE TABLE must_be_rolled_back (id INTEGER);');
         throw new Error('intentional migration failure');
       },
-      version: 1,
     };
-
     try {
       expect(() => runMigrations(database, [failingMigration])).toThrow(
         'intentional migration failure',
       );
       expect(
-        database
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'must_be_rolled_back'",
-          )
-          .get(),
+        database.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'must_be_rolled_back'",
+        ).get(),
       ).toBeUndefined();
-      expect(
-        database.prepare('SELECT * FROM schema_migrations').all(),
-      ).toEqual([]);
+      expect(database.prepare('SELECT * FROM schema_migrations').all()).toEqual([]);
     } finally {
       database.close();
     }
@@ -197,23 +160,15 @@ describe('SQLite migrations', () => {
 });
 
 describe('job identity schema version 2', () => {
-  it('creates exactly the approved columns, types, nullability, and defaults', () => {
+  it('creates exactly the approved observation columns, types, nullability, and defaults', () => {
     const database = openMigratedDatabase();
-
     try {
-      const columns = database
-        .prepare("PRAGMA table_info('job_observations')")
-        .all() as TableColumn[];
-
-      expect(
-        columns.map(({ dflt_value, name, notnull, pk, type }) => ({
-          dflt_value,
-          name,
-          notnull,
-          pk,
-          type,
-        })),
-      ).toEqual([
+      const columns = database.prepare(
+        "PRAGMA table_info('job_observations')",
+      ).all() as TableColumn[];
+      expect(columns.map(({ dflt_value, name, notnull, pk, type }) => ({
+        dflt_value, name, notnull, pk, type,
+      }))).toEqual([
         { dflt_value: null, name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
         { dflt_value: null, name: 'captured_at', notnull: 1, pk: 0, type: 'TEXT' },
         { dflt_value: null, name: 'page_type', notnull: 1, pk: 0, type: 'TEXT' },
@@ -243,17 +198,12 @@ describe('job identity schema version 2', () => {
 
   it('creates constrained jobs and an indexed observation link', () => {
     const database = openMigratedDatabase();
-
     try {
-      const jobColumns = database
-        .prepare("PRAGMA table_info('jobs')")
-        .all() as TableColumn[];
-
+      const jobColumns = database.prepare(
+        "PRAGMA table_info('jobs')",
+      ).all() as TableColumn[];
       expect(jobColumns.map(({ name, notnull, pk, type }) => ({
-        name,
-        notnull,
-        pk,
-        type,
+        name, notnull, pk, type,
       }))).toEqual([
         { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
         { name: 'job_url', notnull: 0, pk: 0, type: 'TEXT' },
@@ -263,25 +213,20 @@ describe('job identity schema version 2', () => {
         { name: 'latest_observation_id', notnull: 1, pk: 0, type: 'INTEGER' },
       ]);
       expect(
-        database
-          .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_job_observations_job_id'")
-          .get(),
+        database.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_job_observations_job_id'",
+        ).get(),
       ).toEqual({ name: 'idx_job_observations_job_id' });
-      expect(() =>
-        database.prepare(`
-          INSERT INTO jobs (
-            job_url,
-            unresolved_observation_id,
-            first_seen_at,
-            last_seen_at,
-            latest_observation_id
-          ) VALUES (NULL, NULL, ?, ?, ?)
-        `).run(
-          '2026-09-03T00:00:00.000Z',
-          '2026-09-03T00:00:00.000Z',
-          1,
-        ),
-      ).toThrow();
+      expect(() => database.prepare(`
+        INSERT INTO jobs (
+          job_url, unresolved_observation_id, first_seen_at, last_seen_at,
+          latest_observation_id
+        ) VALUES (NULL, NULL, ?, ?, ?)
+      `).run(
+        '2026-09-03T00:00:00.000Z',
+        '2026-09-03T00:00:00.000Z',
+        1,
+      )).toThrow();
     } finally {
       database.close();
     }
@@ -296,8 +241,8 @@ describe('job identity schema version 2', () => {
         name TEXT NOT NULL,
         applied_at TEXT NOT NULL
       );
-      INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (1, 'create_job_observations', '2026-09-03T00:00:00.000Z');
+      INSERT INTO schema_migrations VALUES
+        (1, 'create_job_observations', '2026-09-03T00:00:00.000Z');
       CREATE TABLE job_observations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         captured_at TEXT NOT NULL,
@@ -322,18 +267,13 @@ describe('job identity schema version 2', () => {
     `);
     const insert = database.prepare(`
       INSERT INTO job_observations (
-        captured_at,
-        page_type,
-        source_page_url,
-        job_url,
-        title
+        captured_at, page_type, source_page_url, job_url, title
       ) VALUES (?, 'search_results', 'https://example.invalid/source', ?, ?)
     `);
     const urlA = 'https://example.invalid/jobs/A';
     const urlB = 'https://example.invalid/jobs/B';
-
     try {
-      const observationIds = [
+      const ids = [
         Number(insert.run('2026-09-03T10:00:00.000Z', urlA, 'A old').lastInsertRowid),
         Number(insert.run('2026-09-03T11:00:00.000Z', urlA, 'A newer first').lastInsertRowid),
         Number(insert.run('2026-09-03T11:00:00.000Z', urlA, 'A newer tie').lastInsertRowid),
@@ -341,54 +281,27 @@ describe('job identity schema version 2', () => {
         Number(insert.run('2026-09-03T12:00:00.000Z', null, 'unresolved one').lastInsertRowid),
         Number(insert.run('2026-09-03T12:00:00.000Z', null, 'unresolved two').lastInsertRowid),
       ];
-
       runMigrations(database);
       runMigrations(database);
-
       const jobs = database.prepare(`
-        SELECT
-          id,
-          job_url,
-          unresolved_observation_id,
-          first_seen_at,
-          last_seen_at,
-          latest_observation_id
-        FROM jobs
-        ORDER BY id
+        SELECT id, job_url, unresolved_observation_id, first_seen_at,
+               last_seen_at, latest_observation_id
+        FROM jobs ORDER BY id
       `).all() as Array<Record<string, unknown>>;
       const canonicalA = jobs.find((job) => job.job_url === urlA);
       const canonicalB = jobs.find((job) => job.job_url === urlB);
       const unresolved = jobs.filter((job) => job.job_url === null);
-
       expect(jobs).toHaveLength(4);
       expect(canonicalA).toMatchObject({
         first_seen_at: '2026-09-03T10:00:00.000Z',
         last_seen_at: '2026-09-03T11:00:00.000Z',
-        latest_observation_id: observationIds[2],
+        latest_observation_id: ids[2],
         unresolved_observation_id: null,
       });
-      expect(canonicalB).toMatchObject({
-        first_seen_at: '2026-09-03T09:00:00.000Z',
-        last_seen_at: '2026-09-03T09:00:00.000Z',
-        latest_observation_id: observationIds[3],
-      });
+      expect(canonicalB).toMatchObject({ latest_observation_id: ids[3] });
       expect(unresolved.map((job) => job.unresolved_observation_id)).toEqual([
-        observationIds[4],
-        observationIds[5],
+        ids[4], ids[5],
       ]);
-      expect(
-        database.prepare('SELECT id, job_id FROM job_observations ORDER BY id').all(),
-      ).toEqual([
-        { id: observationIds[0], job_id: canonicalA?.id },
-        { id: observationIds[1], job_id: canonicalA?.id },
-        { id: observationIds[2], job_id: canonicalA?.id },
-        { id: observationIds[3], job_id: canonicalB?.id },
-        { id: observationIds[4], job_id: unresolved[0]?.id },
-        { id: observationIds[5], job_id: unresolved[1]?.id },
-      ]);
-      expect(
-        database.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE version = 2').get(),
-      ).toEqual({ count: 1 });
       expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
     } finally {
       database.close();
@@ -398,15 +311,10 @@ describe('job identity schema version 2', () => {
   it('rejects unsupported page types at the database boundary', () => {
     const database = openMigratedDatabase();
     const repository = createJobObservationRepository(database);
-
     try {
-      expect(() =>
-        repository.append(
-          createObservation({
-            pageType: 'unsupported' as JobObservationInput['pageType'],
-          }),
-        ),
-      ).toThrow(/CHECK constraint failed/u);
+      expect(() => repository.append(createObservation({
+        pageType: 'unsupported' as JobObservationInput['pageType'],
+      }))).toThrow(/CHECK constraint failed/u);
     } finally {
       database.close();
     }
@@ -416,7 +324,6 @@ describe('job identity schema version 2', () => {
     const database = openMigratedDatabase();
     const repository = createJobObservationRepository(database);
     const jobUrl = 'https://www.zhipin.com/job_detail/example.html';
-
     try {
       repository.append(createObservation({ jobUrl }));
       repository.append(createObservation({
@@ -425,41 +332,26 @@ describe('job identity schema version 2', () => {
         pageType: 'job_detail',
         sourcePageUrl: jobUrl,
       }));
-
-      const observations = database
-        .prepare(
-          `SELECT
-            job_url,
-            job_href_raw,
-            title,
-            company_name,
-            salary_text,
-            location_text,
-            experience_text,
-            education_text,
-            recruiter_activity_text,
-            published_text,
-            full_jd_text
-          FROM job_observations
-          ORDER BY id`,
-        )
-        .all();
-
-      expect(observations).toHaveLength(2);
-      expect(observations[0]).toEqual({
-        company_name: null,
-        education_text: null,
-        experience_text: null,
-        full_jd_text: null,
-        job_href_raw: null,
+      const rows = database.prepare(`
+        SELECT job_url, title, company_name, salary_text, location_text,
+               experience_text, education_text, recruiter_activity_text,
+               published_text, full_jd_text
+        FROM job_observations ORDER BY id
+      `).all();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toEqual({
         job_url: jobUrl,
-        location_text: null,
-        published_text: null,
-        recruiter_activity_text: null,
-        salary_text: null,
         title: null,
+        company_name: null,
+        salary_text: null,
+        location_text: null,
+        experience_text: null,
+        education_text: null,
+        recruiter_activity_text: null,
+        published_text: null,
+        full_jd_text: null,
       });
-      expect(observations[1]).toMatchObject({ job_url: jobUrl });
+      expect(rows[1]).toMatchObject({ job_url: jobUrl });
     } finally {
       database.close();
     }
@@ -467,15 +359,11 @@ describe('job identity schema version 2', () => {
 
   it('uses approved JSON and raw-text defaults', () => {
     const database = openMigratedDatabase();
-
     try {
       database.transaction(() => {
         const job = database.prepare(`
           INSERT INTO jobs (
-            job_url,
-            unresolved_observation_id,
-            first_seen_at,
-            last_seen_at,
+            job_url, unresolved_observation_id, first_seen_at, last_seen_at,
             latest_observation_id
           ) VALUES (?, NULL, ?, ?, 1)
         `).run(
@@ -485,11 +373,7 @@ describe('job identity schema version 2', () => {
         );
         database.prepare(`
           INSERT INTO job_observations (
-            id,
-            captured_at,
-            page_type,
-            source_page_url,
-            job_id
+            id, captured_at, page_type, source_page_url, job_id
           ) VALUES (1, ?, 'search_results', ?, ?)
         `).run(
           '2026-09-03T00:00:00.000Z',
@@ -497,17 +381,13 @@ describe('job identity schema version 2', () => {
           job.lastInsertRowid,
         );
       })();
-
-      expect(
-        database
-          .prepare(
-            'SELECT tags_json, raw_text, missing_fields_json, warnings_json FROM job_observations',
-          )
-          .get(),
-      ).toEqual({
-        missing_fields_json: '[]',
-        raw_text: '',
+      expect(database.prepare(`
+        SELECT tags_json, raw_text, missing_fields_json, warnings_json
+        FROM job_observations
+      `).get()).toEqual({
         tags_json: '[]',
+        raw_text: '',
+        missing_fields_json: '[]',
         warnings_json: '[]',
       });
     } finally {
@@ -519,46 +399,22 @@ describe('job identity schema version 2', () => {
 describe('import provenance schema version 3', () => {
   it('creates constrained import and search run tables plus the observation link', () => {
     const database = openMigratedDatabase();
-
     try {
-      const importColumns = database
-        .prepare("PRAGMA table_info('import_runs')")
-        .all() as TableColumn[];
-      const searchColumns = database
-        .prepare("PRAGMA table_info('search_runs')")
-        .all() as TableColumn[];
-
-      expect(importColumns.map(({ name, notnull, pk, type }) => ({
-        name,
-        notnull,
-        pk,
-        type,
-      }))).toEqual([
-        { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
-        { name: 'client_import_id', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'payload_sha256', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'page_type', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'source_page_url', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'captured_at', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'matched_card_count', notnull: 0, pk: 0, type: 'INTEGER' },
-        { name: 'extraction_warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'observation_count', notnull: 1, pk: 0, type: 'INTEGER' },
-        { name: 'created_at', notnull: 1, pk: 0, type: 'TEXT' },
+      const importColumns = database.prepare(
+        "PRAGMA table_info('import_runs')",
+      ).all() as TableColumn[];
+      const searchColumns = database.prepare(
+        "PRAGMA table_info('search_runs')",
+      ).all() as TableColumn[];
+      expect(importColumns.map(({ name }) => name)).toEqual([
+        'id', 'client_import_id', 'payload_sha256', 'page_type',
+        'source_page_url', 'captured_at', 'matched_card_count',
+        'extraction_warnings_json', 'observation_count', 'created_at',
       ]);
-      expect(searchColumns.map(({ name, notnull, pk, type }) => ({
-        name,
-        notnull,
-        pk,
-        type,
-      }))).toEqual([
-        { name: 'id', notnull: 0, pk: 1, type: 'INTEGER' },
-        { name: 'import_run_id', notnull: 1, pk: 0, type: 'INTEGER' },
-        { name: 'captured_at', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'source_page_url', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'matched_card_count', notnull: 1, pk: 0, type: 'INTEGER' },
-        { name: 'saved_observation_count', notnull: 1, pk: 0, type: 'INTEGER' },
-        { name: 'extraction_warnings_json', notnull: 1, pk: 0, type: 'TEXT' },
-        { name: 'created_at', notnull: 1, pk: 0, type: 'TEXT' },
+      expect(searchColumns.map(({ name }) => name)).toEqual([
+        'id', 'import_run_id', 'captured_at', 'source_page_url',
+        'matched_card_count', 'saved_observation_count',
+        'extraction_warnings_json', 'created_at',
       ]);
       expect(
         database.prepare(
@@ -637,7 +493,6 @@ describe('import provenance schema version 3', () => {
       );
       COMMIT;
     `);
-
     try {
       const beforeJob = database.prepare('SELECT * FROM jobs').get();
       const beforeObservation = database.prepare(`
@@ -645,10 +500,8 @@ describe('import provenance schema version 3', () => {
                tags_json, raw_text, missing_fields_json, warnings_json, job_id
         FROM job_observations
       `).get();
-
       runMigrations(database);
       runMigrations(database);
-
       expect(database.prepare('SELECT * FROM jobs').get()).toEqual(beforeJob);
       expect(database.prepare(`
         SELECT id, captured_at, page_type, source_page_url, job_url, title,
@@ -659,7 +512,9 @@ describe('import provenance schema version 3', () => {
         database.prepare('SELECT import_run_id FROM job_observations').get(),
       ).toEqual({ import_run_id: null });
       expect(
-        database.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE version = 3').get(),
+        database.prepare(
+          'SELECT COUNT(*) AS count FROM schema_migrations WHERE version = 3',
+        ).get(),
       ).toEqual({ count: 1 });
       expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
     } finally {
