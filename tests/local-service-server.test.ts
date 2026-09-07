@@ -7,6 +7,7 @@ import {
   startLocalService,
   type ImportBatchWriter,
   type JobLinkCheckWriter,
+  type StructuredLlmAnalysisWriter,
 } from '../src/local-service/server';
 
 const TEST_IMPORT_WRITER: ImportBatchWriter = {
@@ -62,6 +63,7 @@ describe('loopback-only local service', () => {
         options: {
           readonly imports: ImportBatchWriter;
           readonly linkChecks?: JobLinkCheckWriter;
+          readonly structuredLlmAnalyses?: StructuredLlmAnalysisWriter;
           readonly port: number;
         },
       ]
