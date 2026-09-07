@@ -5,14 +5,15 @@
 - 仓库：`MuHai12345/boss-job-radar`
 - 分支：`master`
 - Phase 0–5：`PASS`
-- 最近完成批次：`Phase 5 / Batch 4 — PASS`
-- 最近验证能力：Capability 11 — 成长性 / 转行价值 / 风险 / 当前机会优先级 / 面试追问
-- 下一阶段：`Phase 6`
-- 下一批：`Phase 6 / Batch 1 — Capability 12 structured LLM analysis foundation`
-- Batch 4 产品实现 commit：`3cfa14478ae9cc2e354c6b423ad4bc43abe4d70f`
-- Batch 4 最终外部测试 head：`1ac43bc503df57943344b9774de0b4ef9007ae45`
-- Batch 4 最终 CI run：`34129608266`
-- 核心能力矩阵：`12 / 15 VERIFIED`
+- Phase 6：`IN PROGRESS`
+- 最近完成批次：`Phase 6 / Batch 1 — PASS`
+- 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
+- 下一批：`Phase 6 / Batch 2 — OpenAI Responses provider transport v1`
+- Batch 1 Codex 产品实现 commit：`c8edc28f7a521098db132460a9d64ee34fecae27`
+- Batch 1 产品 lineage merge：`beb7bcb9ab87893b8626761d97b77cd19596acf5`
+- Batch 1 最终外部测试 head：`20b208721f119155ceed4d8421f10f7238ea9557`
+- Batch 1 最终 CI run：`34132535995`
+- 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
 - 当前实现阻塞：无
 
 ## 已验证核心能力
@@ -30,65 +31,78 @@
 11. 成长性 / 转行价值 / 风险 / 当前机会优先级 / 面试追问
 15. SearchRun 范围薪资 PUA 可信解码与正式产品链路
 
-尚未完成：Capability 12–14。
+尚未整体验证：Capability 12–14。
 
-## Phase 5 / Batch 4 验收
+其中 Capability 12 已完成 provider-neutral foundation，但整体仍为 `IN_PROGRESS`。
 
-产品实现：
+## Phase 6 / Batch 1 验收
 
-`3cfa14478ae9cc2e354c6b423ad4bc43abe4d70f`
+Batch 1 建立了 provider-neutral structured LLM analysis foundation：
 
-外部测试 head：
+- `StructuredLlmProvider` 抽象；
+- 最小化 LLM input snapshot；
+- 完整 JD 与 authoritative upstream structured facts 输入边界；
+- prompt injection / delimiter 防线；
+- 固定 prompt version 与 output schema version；
+- exact-shape structured output validator；
+- full-JD substring evidence grounding；
+- deterministic / status / opportunity evidence-code grounding；
+- schema v8 `structured_llm_analyses`；
+- provider/model/source-state append-only history；
+- same-state idempotency；
+- provider call outside SQLite transaction；
+- source-change race rejection；
+- provider failure / invalid output / stored corruption fail closed；
+- missing complete JD 时不调用 provider；
+- `LocalDatabase` 只暴露 repository，不产生自动远程调用。
 
-`1ac43bc503df57943344b9774de0b4ef9007ae45`
-
-GitHub Actions run：
-
-`34129608266`
+本批没有真实 provider、API key、HTTP LLM endpoint、popup/UI 或自动调用。
 
 最终工程验证：
 
 - `npm ci`：PASS
 - `npm run typecheck`：PASS
 - `npm run lint`：PASS
-- `npm test`：PASS — **46 test files / 655 tests passed**
+- `npm test`：PASS — **48 test files / 679 tests passed**
 - `npm run build`：PASS
 - `npm run build:edge`：PASS
 - `npm run build:local`：PASS
 - `npm run verify:manifests`：PASS
 
-Batch 4 外部测试覆盖了：growth / career-switch / risks / priority / interview questions、schema v7、append-only persistence、source-state idempotency、time-only recency transition、manual link refresh、runtime backfill、stored corruption fail-closed、failure isolation 与完整回归。
+第一次全量 CI 暴露的失败全部是既有测试仍断言 schema v7 的测试基线漂移；外部网页版 ChatGPT 更新测试基线到 v8 后全量回归通过，没有发现需要 Codex 修复的 Batch 1 产品代码缺陷。
 
-Batch 4 没有新增浏览器 UI、BOSS DOM 解析或新的 HTTP read 行为，因此无需新增真实 BOSS 浏览器人工验收。
+正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
 
-正式记录：`docs/verification/2026-09-07-phase-5-batch-4-external-verification.md`
+## Phase 6 / Batch 2 方向
 
-## Phase 6 方向
+下一批只接入第一个具体 provider transport：OpenAI Responses API。
 
-Phase 6 对应 Capability 12：structured LLM analysis。
+批准设计：
 
-必须建立在已经验证的原始事实和确定性结论之上。LLM 输出是附加的结构化语义解释，不得覆盖或改写：
+`docs/decisions/ADR-0016-openai-structured-llm-provider-v1.md`
 
-- JobObservation 原始事实；
-- deterministic job nature / experience；
-- JobStatusAssessment；
-- JobOpportunityAssessment；
-- salary decoding facts。
+Batch 2 范围：
 
-Phase 6 必须继续满足：
+- OpenAI Responses API transport；
+- `providerId = openai`；
+- 显式模型 ID；
+- API key 只作为 provider constructor secret，不持久化、不记录；
+- Responses Structured Outputs `json_schema` + strict；
+- `store:false`、无 tools、无 background、无 conversation；
+- 固定 timeout；
+- 零 retry；
+- HTTP / refusal / incomplete / malformed output 统一 fail closed；
+- fake transport 外部测试。
 
-- 完整 JD 可以进入经过批准的模型输入，但必须视为不可信数据，防止 JD 文本中的 prompt injection 改变系统指令；
-- structured output 必须严格校验，invalid output fail closed；
-- 不猜测缺失平台字段；
-- 不用模型结果静默删除岗位；
-- 不以简历相似度作为主要判断；
-- 不自动投递、自动聊天、自动打招呼；
-- 不触碰 BOSS Cookie / Session / 私有 API；
-- 模型调用必须显式、可控，不因 import / runtime startup 自动产生远程调用或费用；
-- provider / model / prompt / output schema / source state 必须可追溯；
-- provider 失败或模型输出错误不得损坏已保存事实和确定性分析。
+Batch 2 仍不做：
 
-下一批的批准设计记录在 `docs/decisions/ADR-0015-structured-llm-analysis-foundation.md`。
+- 从本地环境实际加载 API key；
+- localhost LLM endpoint；
+- browser trigger；
+- 真实远程模型验收；
+- Capability 13 UI。
+
+因此 Batch 2 即使 PASS，Capability 12 仍保持 `IN_PROGRESS`。后续还需要受控本地配置、显式用户触发链路和代表性脱敏真实模型评测，才能考虑 Capability 12 整体 `VERIFIED`。
 
 ## 协作与测试规则
 
@@ -97,7 +111,7 @@ Phase 6 必须继续满足：
 - Codex：只负责外部 Prompt 指定的产品源码、必要 migration、commit、push。
 - Codex 不新增或修改测试，不运行测试/typecheck/lint/build/manifest verification，不做 QA 或验收。
 - 外部网页版 ChatGPT：负责全部测试代码、CI、代码审阅、验证、验收和状态文档。
-- 用户不是 CMD 测试执行器；仅在无法远程复现的真实登录 BOSS 浏览器场景下执行最少量人工验证。
+- 用户不是 CMD 测试执行器；仅在无法远程复现的真实登录 BOSS 浏览器或真实 provider 场景下执行最少量人工验证。
 
 ## 长期产品边界
 
