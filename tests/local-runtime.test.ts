@@ -124,7 +124,7 @@ describe('local runtime lifecycle', () => {
     await runtime.close();
 
     await expect(
-      sendHealthRequest(runtime.address.port, 'GET', '/health'),
+      sendHealthRequest(runtime.address.port),
     ).rejects.toMatchObject({ code: 'ECONNREFUSED' });
     expect(() => runtime.database.isForeignKeyEnforcementEnabled()).toThrow();
   });
