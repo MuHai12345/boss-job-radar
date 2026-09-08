@@ -48,7 +48,8 @@
 - Phase 6 / Batch 5A：`PASS` — Lave8 relay adapter v1 + OpenAI backward-compatibility repair
 - Phase 6 / Batch UX-1：`PASS` — persistent Side Panel + canonical parameterized BOSS URLs + restored explicit link check
 - Phase 6 / Batch 5B diagnostics repair：`PASS` — secret-safe relay/runtime failure-stage diagnostics
-- Phase 6 / Batch 5B real evaluation：`PENDING` — resume one explicit representative Lave8 call
+- Phase 6 / Batch 5B pre-retry diagnostics V2：`PASS` — accepted localhost request counting + expanded non-2xx fixed diagnostics
+- Phase 6 / Batch 5B real evaluation：`PENDING` — one new explicit representative Lave8 call
 - Phase 6：`IN_PROGRESS`
 
 ## Capability 12 当前覆盖
@@ -78,32 +79,40 @@
 - Lave8 Bearer secret boundary；
 - strict Responses request/schema/parser；
 - 45 秒 provider timeout；
-- zero retry / zero fallback / max one fetch；
+- zero retry / zero fallback / max one fetch per provider generate；
 - OpenAI existing runtime-config observable contract 保持兼容；
 - provider-neutral remote-data / API-cost disclosure；
 - secret-safe Lave8 diagnostic events；
-- non-2xx safe request-parameter allowlist；
 - response-contract fixed-enum structural summary；
 - runtime fixed analysis failure stages；
 - diagnostic callback failure isolation；
 - browser/server generic `502 analysis_failed` contract 保持；
-- startup/import/link/status/opportunity/health 0 provider calls。
+- startup/import/link/status/opportunity/health 0 provider calls；
+- accepted `/structured-llm-analyses` request 的 process-local ordinal diagnostics；
+- accepted/result ordinal 配对与 fixed outcome；
+- invalid/unauthenticated/malformed/unconfigured request 不计入 accepted analysis HTTP count；
+- Lave8 non-2xx request parameter allowlist 覆盖 `model`、`reasoning.effort`、`text.format.*` 等实际字段；
+- Lave8 non-2xx error body 只映射固定 structure/type/code categories，不输出 raw provider error；
+- Side Panel 明确提示手动再次点击属于新的远程分析尝试，可能再次产生 API 费用。
 
-Batch 5B diagnostics 最终外部工程验证：head `5880db94242849b5cc610d15e4e59cc8f5e45fd4`，CI `34215510564`：**54 test files / 762 tests passed**；typecheck、lint、Chrome build、Edge build、local build、manifest verification 全部 PASS。
+Batch 5B pre-retry diagnostics V2 最终外部工程验证：head `3738ef14df85a66f4dfbbffee3ca6206d207b884`，CI `34219631874`：**56 test files / 769 tests passed**；typecheck、lint、Chrome build、Edge build、local build、manifest verification 全部 PASS。
 
 ## Capability 12 剩余门槛
 
 Capability 12 仍不提前标记 `VERIFIED`。
 
-下一步恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation v1`：
+下一步恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation`：
 
 - 至少 1 个真实已保存 BOSS 岗位，具有完整 JD；
 - 用户主动点击一次 AI 分析；
 - browser → localhost → `https://lave8.com/v1/responses` → strict validator → SQLite；
-- persisted identity 为 `lave8` / `gpt-6-astra`；
+- 同时记录并比较 `analysis_http/request_accepted` 与 `lave8/request_started` 数量；
+- 一个 click 预期最多一个 accepted localhost analysis request、最多一个 relay provider request；
 - 无 automatic paid retry；
 - 无 secret/error leakage；
-- 失败时只采集已验证的 `BJR_LLM_DIAGNOSTIC` 固定安全事件，不盲目重试；
+- 若 accepted HTTP count 与 provider request count 不一致，先定位重复触发层级，不进行额外真实调用；
+- 若 HTTP 400，只有 fixed safe diagnostics 给出明确兼容证据时才批准窄 repair，不盲删参数；
+- 成功后 persisted identity 为 `lave8` / `gpt-6-astra`；
 - 成功后导出一个 sanitized `real-eval-sample.json`；
 - 外部 ChatGPT 对真实 structured result 完成 grounding 与业务可用性人工验收。
 
@@ -118,6 +127,7 @@ Capability 12 仍不提前标记 `VERIFIED`。
 - `docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
 - `docs/verification/2026-09-08-phase-6-batch-ux-1-external-verification.md`
 - `docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
+- `docs/verification/2026-09-08-phase-6-batch-5b-pre-retry-diagnostics-v2-external-verification.md`
 
 当前真实评测设计：
 
