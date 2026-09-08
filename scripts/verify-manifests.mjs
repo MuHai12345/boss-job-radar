@@ -10,9 +10,9 @@ const buildTargets = [
   { name: 'Chrome', directory: 'chrome-mv3' },
   { name: 'Edge', directory: 'edge-mv3' },
 ];
-const expectedPermissions = ['activeTab', 'scripting'];
+const expectedPermissions = ['activeTab', 'scripting', 'sidePanel', 'storage', 'tabs'];
 const expectedHostPermissions = ['http://127.0.0.1:32123/*'];
-const forbiddenPermissions = ['tabs', 'storage', 'cookies'];
+const forbiddenPermissions = ['cookies'];
 
 const forbiddenManifestKeys = [
   'background',
@@ -40,12 +40,17 @@ for (const target of buildTargets) {
   assert.equal(
     typeof manifest.action?.default_popup,
     'string',
-    `${target.name}: popup is missing`,
+    `${target.name}: popup launcher is missing`,
+  );
+  assert.equal(
+    typeof manifest.side_panel?.default_path,
+    'string',
+    `${target.name}: side panel workspace is missing`,
   );
   assert.deepEqual(
     [...manifest.permissions].sort(),
     [...expectedPermissions].sort(),
-    `${target.name}: permissions must be exactly activeTab and scripting`,
+    `${target.name}: permissions must match the approved side-panel workspace set`,
   );
 
   for (const permission of forbiddenPermissions) {
@@ -87,6 +92,6 @@ for (const target of buildTargets) {
   );
 
   console.log(
-    `${target.name}: PASS (MV3, popup, version ${manifest.version}, activeTab + scripting, fixed loopback host permission)`,
+    `${target.name}: PASS (MV3, popup launcher + side panel, version ${manifest.version}, approved side-panel permissions, fixed loopback host permission)`,
   );
 }
