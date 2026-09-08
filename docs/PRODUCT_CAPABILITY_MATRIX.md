@@ -44,6 +44,7 @@
 - Phase 6 / Batch 1：`PASS`（provider-neutral structured LLM analysis foundation）
 - Phase 6 / Batch 2：`PASS`（OpenAI Responses provider transport v1）
 - Phase 6 / Batch 3：`PASS`（product-specific local OpenAI config + protected explicit localhost analysis trigger）
+- Phase 6 / Batch 4：`PASS`（popup explicit user trigger + browser cost/privacy boundary）
 - Phase 6：`IN_PROGRESS`
 
 Phase 6 / Batch 1 已验证：最小输入快照、prompt-injection boundary、strict structured output validation、evidence grounding、schema v8、provider/model/source-state persistence、provider-call idempotency、source-change race、transaction boundary 和失败语义。
@@ -52,10 +53,13 @@ Phase 6 / Batch 2 已验证：OpenAI provider/model allowlist、API key construc
 
 Phase 6 / Batch 3 已验证：产品专用 key/model env、disabled-by-default、partial/invalid config fail closed、startup secret sanitization、runtime optional provider、protected `POST /structured-llm-analyses`、exact canonical jobUrl-only request、Host/Origin/token/content-type/encoding/body-limit security、id-only success response、generic failure hygiene、startup/import/link/status/opportunity 0 provider calls、same-state explicit-trigger idempotency。最终 **50 test files / 714 tests passed**。
 
-Capability 12 仍不提前标记 `VERIFIED`。下一批为 popup 中的显式用户分析动作；该动作通过后仍需用户明确同意后的代表性真实 OpenAI 模型评测。
+Phase 6 / Batch 4 已验证：browser 侧网络前 exact canonical request validation、fresh session per action、jobUrl-only localhost payload、浏览器不接触 API key/model/full JD、50 秒 analysis deadline、zero retry、严格 200 `{id}`、固定 HTTP failure mapping、non-200 body hygiene、popup 初始化 0 analysis calls、click-time active-tab revalidation、in-flight duplicate guard、fresh-final-tab fail-closed restore，以及远程数据/API 费用透明披露。最终 **52 test files / 762 tests passed**；Batch 4 专项 **48 / 48 passed**。
+
+Capability 12 仍不提前标记 `VERIFIED`。产品实现链路已经到达真实 provider 验证门槛；下一步不需要为了“继续编码”而扩张产品范围，而是先完成用户明确同意后的代表性真实 OpenAI end-to-end 评测与人工抽查。
 
 正式记录：
 
 - `docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
 - `docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
 - `docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
+- `docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
