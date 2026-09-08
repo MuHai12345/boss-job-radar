@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BOSS直聘 AI 岗位雷达</title>
+  </head>
+  <body>
+    <header class="workspace-header">
+      <div class="brand"><span class="radar-mark" aria-hidden="true">◎</span><div><p class="eyebrow">求职工作台</p><h1>BOSS直聘 AI 岗位雷达</h1></div></div>
+      <div class="connection-row"><span data-connection>本地服务 · 未检查</span><button class="text-button" data-health>检查连接</button></div>
+      <p class="continuity"><span aria-hidden="true">✓</span> 侧边栏模式 <span class="divider">/</span> 切换页面不中断</p>
+    </header>
+    <main>
+      <section class="card current-job" aria-labelledby="current-title">
+        <div class="section-heading"><h2 id="current-title">岗位概览</h2><span class="badge" data-context>等待识别页面</span></div>
+        <div data-job-summary><h3>从一个岗位开始</h3><p class="muted">打开 BOSS 岗位页面，点击下方按钮读取岗位信息。</p></div>
+        <button class="refresh-button" data-action="refresh" disabled>↻ 刷新当前页信息</button>
+      </section>
+      <section class="actions" aria-label="当前页面操作">
+        <div class="action-grid"><button class="primary" data-action="parse" disabled>解析当前岗位</button><button class="secondary" data-action="save" disabled>保存到本地</button></div>
+        <button class="ai-button" data-action="analyze" disabled><span aria-hidden="true">✦</span> AI 分析当前岗位</button>
+        <p class="disclosure">AI 分析需先保存岗位。点击后，本地服务会将完整职位描述和最小化岗位上下文发送给已配置的模型服务，可能产生 API 费用。</p>
+        <p class="action-status" data-action-status role="status" aria-live="polite">正在恢复最近进度…</p>
+      </section>
+      <section class="card" aria-labelledby="result-title">
+        <div class="section-heading"><h2 id="result-title">解析结果</h2><span class="section-index">01</span></div>
+        <div data-results><p class="muted">解析完成后，岗位字段会在这里按卡片展示。</p></div>
+        <details data-snapshot-details hidden><summary>查看展示层结构化数据</summary><p class="muted small">仅包含精简字段，不含原始页面或完整职位描述。</p><pre data-snapshot-json tabindex="0"></pre></details>
+      </section>
+      <section class="card" aria-labelledby="analysis-title">
+        <div class="section-heading"><h2 id="analysis-title">AI 分析</h2><span class="section-index">02</span></div>
+        <div data-analysis><p class="muted">尚无已确认的分析记录。</p></div>
+      </section>
+      <section class="card history" aria-labelledby="history-title">
+        <div class="section-heading"><h2 id="history-title">最近进度</h2><span class="section-index">03</span></div>
+        <div data-history></div>
+      </section>
+    </main>
+    <footer class="workspace-footer"><p data-page-status>正在确认当前页面…</p><p data-storage-status role="status">正在恢复本地快照…</p></footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

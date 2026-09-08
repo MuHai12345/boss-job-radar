@@ -1,96 +1,25 @@
 import { browser } from 'wxt/browser';
+import './style.css';
 
-import { requestStructuredLlmAnalysisFromLocalService, saveImportRequestToLocalService, saveJobLinkCheckToLocalService } from '../../src/bridge/local-service-client';
-import { initializeJobLinkCheck } from './job-link-check-controller';
-import { initializeStructuredLlmAnalysis } from './structured-llm-analysis-controller';
-import { runJobLinkStatusProbe } from '../../src/page-extraction/job-link-status-probe';
-import { verifiedBossJobDetailSelectorProfile } from '../../src/adapters/boss/job-detail-selector-profile';
-import { verifiedBossJobCardSelectorProfile } from '../../src/adapters/boss/selector-profile';
-import { runManualDomProbe } from '../../src/manual-validation/dom-probe';
-import type { ManualDomProbeResult } from '../../src/manual-validation/dom-probe-types';
-import { runTargetedDomProbe } from '../../src/manual-validation/targeted-dom-probe';
-import type { TargetedDomProbeResult } from '../../src/manual-validation/targeted-dom-probe-types';
-import { runVerifiedBossStructuredExtraction } from '../../src/page-extraction/structured-page-extraction';
-import type { StructuredPageExtractionResult } from '../../src/page-extraction/structured-page-extraction-types';
-import { findPopupElements, initializePopup } from './popup-controller';
+const button = document.querySelector<HTMLButtonElement>('[data-open-workspace]')!;
+const status = document.querySelector<HTMLElement>('[data-launch-status]')!;
+let windowId: number | undefined;
 
-const elements = findPopupElements(document);
-
-void initializeStructuredLlmAnalysis(document, {
-  getActiveTab,
-  analyze: requestStructuredLlmAnalysisFromLocalService,
+// Resolve the window before the click so sidePanel.open keeps user activation.
+void browser.windows.getCurrent().then((current) => {
+  windowId = current.id;
+  button.disabled = windowId === undefined || !browser.sidePanel?.open;
+  if (button.disabled) status.textContent = '当前浏览器无法打开侧边栏，请使用支持侧边栏的 Chrome 或 Edge。';
+}).catch(() => {
+  status.textContent = '无法确认浏览器窗口，请重新打开扩展入口。';
 });
 
-async function getActiveTab() {
-  const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-  return activeTab;
-}
-
-async function executeStructuredInjection(tabId: number) {
-  const [injectionResult] = await browser.scripting.executeScript({
-    target: { tabId },
-    func: runVerifiedBossStructuredExtraction,
-    args: [{
-      cardProfile: verifiedBossJobCardSelectorProfile,
-      detailProfile: verifiedBossJobDetailSelectorProfile,
-    }],
+button.addEventListener('click', () => {
+  if (windowId === undefined || button.disabled) return;
+  button.disabled = true;
+  // A window-wide panel survives tab changes; never set a tab-specific panel.
+  void browser.sidePanel.open({ windowId }).then(() => window.close()).catch(() => {
+    button.disabled = false;
+    status.textContent = '侧边栏未能打开，请重新点击。';
   });
-  return injectionResult;
-}
-
-if (elements === null) {
-  throw new Error('Popup elements are missing.');
-}
-
-void initializePopup(elements, {
-  version: browser.runtime.getManifest().version,
-  getActiveTab,
-  executeProbe: async (tabId): Promise<ManualDomProbeResult | undefined> => {
-    const [injectionResult] = await browser.scripting.executeScript({
-      target: { tabId },
-      func: runManualDomProbe,
-    });
-    return injectionResult?.result;
-  },
-  executeTargetedProbe: async (
-    tabId,
-  ): Promise<TargetedDomProbeResult | undefined> => {
-    const [injectionResult] = await browser.scripting.executeScript({
-      target: { tabId },
-      func: runTargetedDomProbe,
-    });
-    return injectionResult?.result;
-  },
-  executeStructuredExtraction: async (
-    tabId,
-  ): Promise<StructuredPageExtractionResult | undefined> => {
-    const injectionResult = await executeStructuredInjection(tabId);
-    return injectionResult?.result;
-  },
-  createClientImportId: () => crypto.randomUUID(),
-  saveObservations: saveImportRequestToLocalService,
-});
-
-void initializeJobLinkCheck(document, {
-  getActiveTab,
-  saveCheck: saveJobLinkCheckToLocalService,
-  executeInspection: async (tabId, jobUrl) => {
-    const [before] = await browser.scripting.executeScript({
-      target: { tabId }, func: runJobLinkStatusProbe, args: [jobUrl],
-    });
-    if (!before?.result) return undefined;
-    if (before.result.challenge || !before.result.pageMatches) {
-      return { before: before.result, after: before.result, extraction: undefined, documentStable: true };
-    }
-    const extracted = await executeStructuredInjection(tabId);
-    const [after] = await browser.scripting.executeScript({
-      target: { tabId }, func: runJobLinkStatusProbe, args: [jobUrl],
-    });
-    if (!after?.result) return undefined;
-    return {
-      before: before.result, after: after.result, extraction: extracted?.result,
-      documentStable: typeof before.documentId === 'string'
-        && before.documentId === extracted?.documentId && before.documentId === after.documentId,
-    };
-  },
 });
