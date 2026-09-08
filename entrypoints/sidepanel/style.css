@@ -40,6 +40,7 @@ p { margin: 6px 0; }
 .actions button { border-radius: 10px; padding: 11px 8px; font-weight: 600; }
 .primary { background: var(--teal); border: 1px solid var(--teal); color: white; }
 .secondary { background: white; border: 1px solid #b7d4c9; color: #286b59; }
+.actions .link-check-button { width: 100%; margin-top: 9px; padding: 8px; font-size: 12px; font-weight: 400; }
 .ai-button { width: 100%; margin-top: 9px; border: 1px solid #cee2d9; background: #e5f1eb; color: #235f4e; }
 .ai-button span { margin-right: 7px; }
 .disclosure { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 10px 2px 0; }

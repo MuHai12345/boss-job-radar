@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import type { StructuredPageExtractionResult } from '../../src/page-extraction/structured-page-extraction-types';
 import { canonicalBossJobUrl } from '../../src/shared/boss-url-policy';
-import { isIsoTimestamp } from '../../src/shared/job-link-check-types';
+import { canonicalCheckableJobUrl, isIsoTimestamp, type CheckedLinkStatus } from '../../src/shared/job-link-check-types';
 
 const STORAGE_KEY = 'workspace.ui-snapshot.v1';
 export const messages = {
@@ -15,11 +15,12 @@ export const messages = {
   job_not_found: '请先把当前岗位保存到本地，再进行 AI 分析。',
   analysis_unavailable: '当前岗位缺少完整职位描述，请重新保存岗位详情。',
   analysis_not_configured: '本地 AI 分析尚未配置。',
-  canonical: 'AI 分析需要无查询参数的 BOSS 岗位详情链接，请打开下方岗位链接后再试。',
+  canonical: 'AI 分析支持当前 BOSS 岗位详情页，发送前会使用去除页面参数后的岗位标准链接。',
+  link_check: '当前页面无法可靠判断岗位链接状态。',
   interrupted: '上次请求的完成状态尚未确认，最近已确认结果仍保留；不会自动重试。',
 } as const;
 export type ErrorCode = keyof typeof messages;
-export type Action = 'refresh' | 'parse' | 'save' | 'analyze';
+export type Action = 'refresh' | 'parse' | 'save' | 'link_check' | 'analyze';
 
 export interface JobSummary {
   jobUrl: string;
@@ -42,6 +43,7 @@ export interface UiSnapshot {
   pageType: 'job_detail' | 'search_results' | null;
   saved: { jobUrl: string; count: number; at: string } | null;
   analysis: { jobUrl: string; id: number; at: string } | null;
+  linkCheck: { jobUrl: string; status: CheckedLinkStatus; at: string } | null;
   lastOperationAt: string | null;
   viewingPrevious: boolean;
   error: ErrorCode | null;
@@ -51,7 +53,7 @@ export interface UiSnapshot {
 export function emptySnapshot(): UiSnapshot {
   return {
     version: 1, lastJobUrl: null, jobs: [], parsedAt: null, parsedCount: 0,
-    pageType: null, saved: null, analysis: null, lastOperationAt: null,
+    pageType: null, saved: null, analysis: null, linkCheck: null, lastOperationAt: null,
     viewingPrevious: true, error: null, pending: null,
   };
 }
@@ -115,10 +117,16 @@ export function sanitizeSnapshot(value: unknown): UiSnapshot {
   const analysisUrl = jobUrl(analysis.jobUrl);
   const id = positive(analysis.id);
   if (analysisUrl && id && isIsoTimestamp(analysis.at)) clean.analysis = { jobUrl: analysisUrl, id, at: analysis.at };
+  const linkCheck = record(row.linkCheck);
+  const linkCheckUrl = canonicalCheckableJobUrl(linkCheck.jobUrl);
+  if (linkCheckUrl && isIsoTimestamp(linkCheck.at)
+    && (linkCheck.status === 'available' || linkCheck.status === 'explicitly_unavailable' || linkCheck.status === 'unknown')) {
+    clean.linkCheck = { jobUrl: linkCheckUrl, status: linkCheck.status, at: linkCheck.at };
+  }
   clean.lastOperationAt = isIsoTimestamp(row.lastOperationAt) ? row.lastOperationAt : null;
   clean.viewingPrevious = row.viewingPrevious !== false;
   clean.error = typeof row.error === 'string' && Object.hasOwn(messages, row.error) ? row.error as ErrorCode : null;
-  clean.pending = row.pending === 'refresh' || row.pending === 'parse' || row.pending === 'save' || row.pending === 'analyze' ? row.pending : null;
+  clean.pending = row.pending === 'refresh' || row.pending === 'parse' || row.pending === 'save' || row.pending === 'link_check' || row.pending === 'analyze' ? row.pending : null;
   return clean;
 }
 

@@ -1,13 +1,15 @@
 import { browser } from 'wxt/browser';
-import { LOCAL_SERVICE_BASE_URL, requestStructuredLlmAnalysisFromLocalService, saveImportRequestToLocalService } from '../../src/bridge/local-service-client';
+import { LOCAL_SERVICE_BASE_URL, requestStructuredLlmAnalysisFromLocalService, saveImportRequestToLocalService, saveJobLinkCheckToLocalService } from '../../src/bridge/local-service-client';
 import { buildImportRequest } from '../../src/bridge/structured-extraction-to-observations';
 import { verifiedBossJobDetailSelectorProfile } from '../../src/adapters/boss/job-detail-selector-profile';
 import { verifiedBossJobCardSelectorProfile } from '../../src/adapters/boss/selector-profile';
 import { runVerifiedBossStructuredExtraction } from '../../src/page-extraction/structured-page-extraction';
 import { classifyStructuredPageExtractionUrl, requestStructuredPageExtraction } from '../../src/page-extraction/structured-page-extraction-request';
 import { canonicalCheckableJobUrl } from '../../src/shared/job-link-check-types';
+import { requestJobLinkCheck } from '../../src/page-extraction/job-link-check-request';
+import { runJobLinkStatusProbe } from '../../src/page-extraction/job-link-status-probe';
 import { emptySnapshot, jobUrl, loadSnapshot, saveSnapshot, summarizeExtraction, type Action, type ErrorCode } from './snapshot';
-import { find, renderSnapshot, renderStatus } from './view';
+import { find, linkCheckMessages, renderSnapshot, renderStatus } from './view';
 import './style.css';
 
 type Tab = { id?: number; url?: string; pendingUrl?: string };
@@ -28,9 +30,8 @@ function classification(tab: Tab | undefined) {
 }
 
 function analysisUrl(tab: Tab | undefined): string | null {
-  if (tab?.pendingUrl) return null;
-  const canonical = canonicalCheckableJobUrl(tab?.url);
-  return canonical && canonical === tab?.url ? canonical : null;
+  if (!tab || tab.pendingUrl) return null;
+  return canonicalCheckableJobUrl(tab.url);
 }
 
 function render(): void {
@@ -102,7 +103,7 @@ async function perform(action: Action): Promise<void> {
   state.error = null;
   state.pending = action;
   state.lastOperationAt = new Date().toISOString();
-  notice = action === 'analyze' ? '正在分析当前岗位，请稍候…' : action === 'save' ? '正在重新读取并保存当前岗位…' : '正在读取当前页的岗位信息…';
+  notice = action === 'analyze' ? '正在分析当前岗位，请稍候…' : action === 'link_check' ? '正在检查当前岗位链接状态…' : action === 'save' ? '正在重新读取并保存当前岗位…' : '正在读取当前页的岗位信息…';
   render();
   try {
     // Persist the uncertainty before issuing a request; reopening never replays it.
@@ -124,6 +125,44 @@ async function perform(action: Action): Promise<void> {
       } else {
         if (result.code === 'unavailable') connection(false);
         fail(result.code === 'job_not_found' || result.code === 'analysis_unavailable' || result.code === 'analysis_not_configured' ? result.code : 'analysis');
+      }
+      return;
+    }
+
+    if (action === 'link_check') {
+      if (!analysisUrl(tab)) { fail('link_check'); return; }
+      const request = await requestJobLinkCheck(tab, async (tabId, canonical) => {
+        const [before] = await browser.scripting.executeScript({
+          target: { tabId }, func: runJobLinkStatusProbe, args: [canonical],
+        });
+        if (!before?.result) return undefined;
+        if (before.result.challenge || !before.result.pageMatches) {
+          return { before: before.result, after: before.result, extraction: undefined, documentStable: true };
+        }
+        const [extracted] = await browser.scripting.executeScript({
+          target: { tabId }, func: runVerifiedBossStructuredExtraction,
+          args: [{ cardProfile: verifiedBossJobCardSelectorProfile, detailProfile: verifiedBossJobDetailSelectorProfile }],
+        });
+        const [after] = await browser.scripting.executeScript({
+          target: { tabId }, func: runJobLinkStatusProbe, args: [canonical],
+        });
+        if (!after?.result) return undefined;
+        return {
+          before: before.result, after: after.result, extraction: extracted?.result,
+          documentStable: typeof before.documentId === 'string'
+            && before.documentId === extracted?.documentId && before.documentId === after.documentId,
+        };
+      });
+      if (!request) { fail('link_check'); return; }
+      if (!await isStillCurrent(tab, revision)) { fail('changed'); return; }
+      const result = await saveJobLinkCheckToLocalService(request);
+      if (result.ok) {
+        state.linkCheck = { jobUrl: request.jobUrl, status: request.status, at: request.observedAt };
+        state.lastJobUrl = request.jobUrl;
+        notice = linkCheckMessages[request.status];
+        connection(true);
+      } else {
+        notice = result.message;
       }
       return;
     }
@@ -169,7 +208,7 @@ async function perform(action: Action): Promise<void> {
       }
     }
   } catch {
-    fail(action === 'analyze' ? 'analysis' : action === 'save' ? 'save' : 'permission');
+    fail(action === 'analyze' ? 'analysis' : action === 'link_check' ? 'link_check' : action === 'save' ? 'save' : 'permission');
   } finally {
     state.pending = null;
     state.lastOperationAt = new Date().toISOString();
@@ -186,7 +225,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]
   button.addEventListener('click', () => {
     if (button.disabled) return;
     const action = button.dataset.action;
-    if (action === 'refresh' || action === 'parse' || action === 'save' || action === 'analyze') void perform(action);
+    if (action === 'refresh' || action === 'parse' || action === 'save' || action === 'link_check' || action === 'analyze') void perform(action);
   });
 }
 

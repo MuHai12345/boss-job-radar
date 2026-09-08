@@ -1,5 +1,17 @@
 import { messages, type JobSummary, type UiSnapshot } from './snapshot';
 
+export const linkCheckMessages = {
+  available: '当前岗位链接可正常打开。',
+  explicitly_unavailable: '当前页面明确显示该岗位已失效。',
+  unknown: '当前页面无法可靠判断岗位链接状态。',
+} as const;
+
+const linkCheckLabels = {
+  available: '岗位链接有效',
+  explicitly_unavailable: '岗位已失效',
+  unknown: '状态未知',
+} as const;
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, text: string, className = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -89,6 +101,7 @@ export function renderSnapshot(state: UiSnapshot): void {
   const entries: { label: string; at: string; url: string | null }[] = [];
   if (state.parsedAt) entries.push({ label: '最近解析 · 展示摘要已生成', at: state.parsedAt, url: first?.jobUrl ?? null });
   if (state.saved) entries.push({ label: `最近保存 · ${state.saved.count} 条岗位记录`, at: state.saved.at, url: state.saved.jobUrl });
+  if (state.linkCheck) entries.push({ label: `最近检查 · ${linkCheckLabels[state.linkCheck.status]} ${linkCheckMessages[state.linkCheck.status]}`, at: state.linkCheck.at, url: state.linkCheck.jobUrl });
   if (state.analysis) entries.push({ label: '最近分析 · 已保存到本地服务', at: state.analysis.at, url: state.analysis.jobUrl });
   entries.sort((left, right) => right.at.localeCompare(left.at));
   for (const entry of entries) {
@@ -97,7 +110,7 @@ export function renderSnapshot(state: UiSnapshot): void {
     if (entry.url) item.append(element('br', ''), link(entry.url));
     history.append(item);
   }
-  if (!entries.length) history.append(element('p', '你的最近一次解析、保存和分析进度将在这里保留。', 'muted'));
+  if (!entries.length) history.append(element('p', '你的最近一次解析、保存、链接检查和分析进度将在这里保留。', 'muted'));
   if (state.lastOperationAt) history.append(element('p', '最近操作', 'muted small'), timestamp(state.lastOperationAt));
 }
 
@@ -106,8 +119,8 @@ export function renderStatus(state: UiSnapshot, options: {
 }): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
     const action = button.dataset.action;
-    button.disabled = !options.ready || options.busy || !options.supported || (action === 'analyze' && !options.canAnalyze);
-    const labels: Record<string, string> = { refresh: '↻ 刷新当前页信息', parse: '解析当前岗位', save: '保存到本地', analyze: '✦ AI 分析当前岗位' };
+    button.disabled = !options.ready || options.busy || !options.supported || ((action === 'analyze' || action === 'link_check') && !options.canAnalyze);
+    const labels: Record<string, string> = { refresh: '↻ 刷新当前页信息', parse: '解析当前岗位', save: '保存到本地', link_check: '检查岗位链接状态', analyze: '✦ AI 分析当前岗位' };
     button.textContent = options.busy && state.pending === action ? '正在处理…' : labels[action ?? ''] ?? '';
   }
   find('.actions').setAttribute('aria-busy', String(options.busy));
@@ -121,6 +134,6 @@ export function renderStatus(state: UiSnapshot, options: {
       ? '当前页面支持读取。正在查看保留结果，点击刷新可同步当前页。'
       : '已同步当前页。页面内容更新后，可主动点击刷新。';
   if (options.supported && !options.canAnalyze) {
-    find('[data-page-status]').textContent += ' AI 分析仅支持无查询参数的 HTTPS 岗位详情链接。';
+    find('[data-page-status]').textContent += ' AI 分析和链接检查支持 BOSS 岗位详情页，发送前会去除页面参数。';
   }
 }
