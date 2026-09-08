@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 
-import { saveImportRequestToLocalService, saveJobLinkCheckToLocalService } from '../../src/bridge/local-service-client';
+import { requestStructuredLlmAnalysisFromLocalService, saveImportRequestToLocalService, saveJobLinkCheckToLocalService } from '../../src/bridge/local-service-client';
 import { initializeJobLinkCheck } from './job-link-check-controller';
+import { initializeStructuredLlmAnalysis } from './structured-llm-analysis-controller';
 import { runJobLinkStatusProbe } from '../../src/page-extraction/job-link-status-probe';
 import { verifiedBossJobDetailSelectorProfile } from '../../src/adapters/boss/job-detail-selector-profile';
 import { verifiedBossJobCardSelectorProfile } from '../../src/adapters/boss/selector-profile';
@@ -14,6 +15,11 @@ import type { StructuredPageExtractionResult } from '../../src/page-extraction/s
 import { findPopupElements, initializePopup } from './popup-controller';
 
 const elements = findPopupElements(document);
+
+void initializeStructuredLlmAnalysis(document, {
+  getActiveTab,
+  analyze: requestStructuredLlmAnalysisFromLocalService,
+});
 
 async function getActiveTab() {
   const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });

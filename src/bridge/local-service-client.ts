@@ -1,8 +1,13 @@
 import type { ImportRequest } from '../shared/import-request-types';
 import { validateJobLinkCheckRequest, type JobLinkCheckRequest } from '../shared/job-link-check-types';
+import {
+  validateStructuredLlmAnalysisRequest,
+  type StructuredLlmAnalysisRequest,
+} from '../shared/structured-llm-analysis-request';
 
 export const LOCAL_SERVICE_BASE_URL = 'http://127.0.0.1:32123';
 const REQUEST_TIMEOUT_MS = 5_000;
+export const STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS = 50_000;
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/u;
 
 export type LocalServiceSaveFailureCode =
@@ -243,5 +248,140 @@ export async function saveJobLinkCheckToLocalService(
     return { ok: true };
   } catch {
     return { ok: false, message: '本地服务未启动或无法连接。' };
+  }
+}
+
+export type LocalServiceStructuredLlmAnalysisFailureCode =
+  | 'unavailable'
+  | 'incompatible_version'
+  | 'invalid_request'
+  | 'invalid_session'
+  | 'job_not_found'
+  | 'analysis_unavailable'
+  | 'analysis_not_configured'
+  | 'analysis_failed'
+  | 'payload_too_large'
+  | 'invalid_response';
+
+export type LocalServiceStructuredLlmAnalysisResult =
+  | { readonly ok: true; readonly id: number }
+  | {
+      readonly ok: false;
+      readonly code: LocalServiceStructuredLlmAnalysisFailureCode;
+      readonly message: string;
+    };
+
+const analysisFailureMessages: Record<LocalServiceStructuredLlmAnalysisFailureCode, string> = {
+  unavailable: '本地服务未启动或无法连接。',
+  incompatible_version: '本地服务版本与扩展不兼容。',
+  invalid_request: '当前岗位无法发起 AI 分析。',
+  invalid_session: '本地服务会话无效，请重新点击分析。',
+  job_not_found: '请先把当前岗位保存到本地，再进行 AI 分析。',
+  analysis_unavailable: '当前岗位缺少可分析的完整 JD，请重新保存岗位详情后再试。',
+  analysis_not_configured: '本地 AI 分析尚未配置。',
+  analysis_failed: 'AI 分析失败，未保存新的分析结果。',
+  payload_too_large: 'AI 分析请求数据过大。',
+  invalid_response: '本地服务返回了无法识别的 AI 分析响应。',
+};
+
+function analysisFailure(
+  code: LocalServiceStructuredLlmAnalysisFailureCode,
+): LocalServiceStructuredLlmAnalysisResult {
+  return { ok: false, code, message: analysisFailureMessages[code] };
+}
+
+function analysisFailureForStatus(status: number): LocalServiceStructuredLlmAnalysisResult {
+  switch (status) {
+    case 400: return analysisFailure('invalid_request');
+    case 403: return analysisFailure('invalid_session');
+    case 404: return analysisFailure('job_not_found');
+    case 413: return analysisFailure('payload_too_large');
+    case 422: return analysisFailure('analysis_unavailable');
+    case 502: return analysisFailure('analysis_failed');
+    case 503: return analysisFailure('analysis_not_configured');
+    default: return analysisFailure('invalid_response');
+  }
+}
+
+async function postStructuredLlmAnalysisWithTimeout(
+  fetchImplementation: typeof fetch,
+  request: StructuredLlmAnalysisRequest,
+  token: string,
+): Promise<{ status: number; body: unknown }> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Structured LLM analysis request timed out'));
+    }, STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    // One POST only. The deadline includes body consumption, even if an
+    // injected transport does not reject on abort. Error bodies are not read.
+    return await Promise.race([
+      (async () => {
+        const response = await fetchImplementation(
+          `${LOCAL_SERVICE_BASE_URL}/structured-llm-analyses`,
+          {
+            method: 'POST',
+            redirect: 'error',
+            credentials: 'omit',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Boss-Job-Radar-Token': token,
+            },
+            body: JSON.stringify({ jobUrl: request.jobUrl }),
+          },
+        );
+        const body = response.status === 200 ? await readJson(response) : undefined;
+        return { status: response.status, body };
+      })(),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function requestStructuredLlmAnalysisFromLocalService(
+  request: StructuredLlmAnalysisRequest,
+  fetchImplementation: typeof fetch = globalThis.fetch,
+): Promise<LocalServiceStructuredLlmAnalysisResult> {
+  const value = validateStructuredLlmAnalysisRequest(request);
+  if (value === null) return analysisFailure('invalid_request');
+
+  try {
+    // The token exists only for this explicit action and is never reused.
+    const sessionResponse = await fetchWithTimeout(
+      fetchImplementation,
+      `${LOCAL_SERVICE_BASE_URL}/bridge/session`,
+      { method: 'GET', cache: 'no-store', redirect: 'error', credentials: 'omit' },
+    );
+    if (sessionResponse.status !== 200) {
+      return analysisFailureForStatus(sessionResponse.status);
+    }
+    const session = sessionResponse.body;
+    if (
+      !isRecord(session) || Reflect.ownKeys(session).length !== 2
+      || !Object.hasOwn(session, 'protocolVersion') || !Object.hasOwn(session, 'token')
+    ) return analysisFailure('invalid_response');
+    if (session.protocolVersion !== 2) return analysisFailure('incompatible_version');
+    if (typeof session.token !== 'string' || !TOKEN_PATTERN.test(session.token)) {
+      return analysisFailure('invalid_response');
+    }
+
+    const response = await postStructuredLlmAnalysisWithTimeout(fetchImplementation, value, session.token);
+    if (response.status !== 200) return analysisFailureForStatus(response.status);
+    const result = response.body;
+    if (
+      !isRecord(result) || Reflect.ownKeys(result).length !== 1 || !Object.hasOwn(result, 'id')
+      || typeof result.id !== 'number' || !Number.isSafeInteger(result.id) || result.id <= 0
+    ) return analysisFailure('invalid_response');
+    return { ok: true, id: result.id };
+  } catch {
+    return analysisFailure('unavailable');
   }
 }

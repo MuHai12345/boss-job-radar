@@ -95,6 +95,20 @@
         <p class="probe-status" data-job-link-check-status aria-live="polite"></p>
       </section>
 
+      <section class="probe-action" data-structured-llm-analysis-action hidden>
+        <h2>AI 岗位分析</h2>
+        <p class="privacy-note">
+          请先把当前岗位保存到本地。只有点击下方按钮后才会分析：本地服务会从已保存岗位读取完整 JD 和批准的最小化岗位上下文，发送到你配置的 OpenAI 模型，可能产生 OpenAI API 费用。
+        </p>
+        <p class="privacy-note">
+          岗位链接仅用于向本地服务指定当前岗位。产品不会主动把公司名称（companyName）、岗位链接（jobUrl）、整页 rawText、Cookie 或 Session 作为 OpenAI provider 输入发送。
+        </p>
+        <button type="button" data-structured-llm-analysis-button disabled>
+          发送到 OpenAI 并分析当前岗位
+        </button>
+        <p class="probe-status" data-structured-llm-analysis-status aria-live="polite"></p>
+      </section>
+
       <section class="probe-result" data-probe-result hidden>
         <h2>结构诊断结果</h2>
         <p class="share-warning">
