@@ -186,7 +186,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
     }
   });
 
-  it('rejects malformed output JSON, malformed HTTP JSON, and non-2xx without reading an error body', async () => {
+  it('rejects malformed output JSON, malformed HTTP JSON, and non-2xx after only a bounded diagnostic JSON read', async () => {
     const invalidOutput = provider(async () => responseJson({
       ...(completedResponse({ ok: true }) as Record<string, unknown>),
       output: [{
@@ -209,7 +209,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
       },
     } as unknown as Response);
     await expect(provider(non2xx).generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(jsonRead).toBe(false);
+    expect(jsonRead).toBe(true);
   });
 
   it('uses zero retries and does not leak a thrown relay/network error', async () => {
