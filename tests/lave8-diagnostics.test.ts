@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  safeLave8RequestParameter,
+  summarizeLave8Error,
+} from '../src/domain/llm/lave8-structured-llm-diagnostics';
+import {
   createLave8StructuredLlmProvider,
   LAVE8_STRUCTURED_LLM_TIMEOUT_MS,
   type Lave8StructuredLlmDiagnosticEvent,
@@ -62,6 +66,65 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('Lave8 secret-safe diagnostic classifiers', () => {
+  it('recognizes only the approved request parameter paths and maps everything else to unknown', () => {
+    const approved = [
+      'model', 'background', 'store', 'stream', 'reasoning', 'reasoning.effort',
+      'max_output_tokens', 'input', 'text', 'text.format', 'text.format.type',
+      'text.format.name', 'text.format.strict', 'text.format.schema',
+    ] as const;
+    for (const param of approved) {
+      expect(safeLave8RequestParameter({ error: { param } })).toBe(param);
+    }
+    expect(safeLave8RequestParameter({ error: { param: 'PRIVATE_UNKNOWN_PARAMETER' } })).toBe('unknown');
+    expect(safeLave8RequestParameter({ error: { param: 123 } })).toBe('unknown');
+    expect(safeLave8RequestParameter(null)).toBe('unknown');
+  });
+
+  it('summarizes only fixed error structure/type/code categories without reading message accessors', () => {
+    expect(summarizeLave8Error(undefined)).toEqual({
+      bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent',
+    });
+    expect(summarizeLave8Error({ ok: false })).toEqual({
+      bodyStructure: 'error_object_absent', errorType: 'absent', errorCode: 'absent',
+    });
+    expect(summarizeLave8Error({ error: {
+      type: 'invalid_request_error', code: 'unsupported_parameter', message: 'PRIVATE_RAW_MESSAGE',
+    } })).toEqual({
+      bodyStructure: 'error_object_present', errorType: 'invalid_request', errorCode: 'unsupported_parameter',
+    });
+    expect(summarizeLave8Error({ error: {
+      type: 'authentication_error', code: 'invalid_api_key',
+    } })).toEqual({
+      bodyStructure: 'error_object_present', errorType: 'authentication', errorCode: 'invalid_api_key',
+    });
+    expect(summarizeLave8Error({ error: {
+      type: 'rate_limit_error', code: 'insufficient_quota',
+    } })).toEqual({
+      bodyStructure: 'error_object_present', errorType: 'rate_limit', errorCode: 'insufficient_quota',
+    });
+    expect(summarizeLave8Error({ error: {
+      type: 'PRIVATE_EXTERNAL_TYPE', code: 'PRIVATE_EXTERNAL_CODE',
+    } })).toEqual({
+      bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other',
+    });
+
+    let messageRead = false;
+    const externalError = { type: 'server_error', code: 'context_length_exceeded' } as Record<string, unknown>;
+    Object.defineProperty(externalError, 'message', {
+      enumerable: true,
+      get() {
+        messageRead = true;
+        throw new Error('PRIVATE_MESSAGE_ACCESSOR');
+      },
+    });
+    expect(summarizeLave8Error({ error: externalError })).toEqual({
+      bodyStructure: 'error_object_present', errorType: 'server', errorCode: 'context_length',
+    });
+    expect(messageRead).toBe(false);
+  });
+});
+
 describe('Lave8 secret-safe transport diagnostics', () => {
   it('emits only request/http/accepted metadata for a successful response', async () => {
     const events: Lave8StructuredLlmDiagnosticEvent[] = [];
@@ -82,16 +145,16 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     }
   });
 
-  it('extracts only an allowlisted non-2xx request parameter and never relays provider error text', async () => {
+  it('extracts only approved non-2xx metadata and never relays provider error text', async () => {
     const events: Lave8StructuredLlmDiagnosticEvent[] = [];
     const provider = create({
       events,
       fetchImpl: async () => responseJson({
         error: {
-          param: 'reasoning',
+          param: 'reasoning.effort',
           message: `PRIVATE_UPSTREAM_MESSAGE ${SECRET}`,
-          code: 'PRIVATE_CODE',
-          type: 'PRIVATE_TYPE',
+          code: 'unsupported_parameter',
+          type: 'invalid_request_error',
         },
       }, 400),
     });
@@ -100,26 +163,56 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events).toEqual([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 400 },
-      { scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'reasoning' },
+      {
+        scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'reasoning.effort',
+        summary: {
+          bodyStructure: 'error_object_present', errorType: 'invalid_request', errorCode: 'unsupported_parameter',
+        },
+      },
     ]);
     expect(JSON.stringify(events)).not.toContain('PRIVATE_');
     expect(JSON.stringify(events)).not.toContain(SECRET);
   });
 
-  it('maps arbitrary upstream error.param values to unknown', async () => {
+  it('maps arbitrary upstream error metadata to fixed unknown/other categories', async () => {
     const events: Lave8StructuredLlmDiagnosticEvent[] = [];
     const provider = create({
       events,
       fetchImpl: async () => responseJson({
-        error: { param: 'PRIVATE_MADE_UP_FIELD', message: 'PRIVATE_BODY' },
+        error: {
+          param: 'PRIVATE_MADE_UP_FIELD',
+          message: 'PRIVATE_BODY',
+          type: 'PRIVATE_TYPE',
+          code: 'PRIVATE_CODE',
+        },
       }, 422),
     });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
     expect(events.at(-1)).toEqual({
       scope: 'lave8', event: 'http_non_2xx', status: 422, requestParameter: 'unknown',
+      summary: {
+        bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other',
+      },
     });
     expect(JSON.stringify(events)).not.toContain('PRIVATE_');
+  });
+
+  it('classifies a non-JSON non-2xx body without exposing the body', async () => {
+    const events: Lave8StructuredLlmDiagnosticEvent[] = [];
+    const provider = create({
+      events,
+      fetchImpl: async () => new Response('PRIVATE_NON_JSON_ERROR_BODY', { status: 400 }),
+    });
+
+    await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
+    expect(events.at(-1)).toEqual({
+      scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'unknown',
+      summary: {
+        bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent',
+      },
+    });
+    expect(JSON.stringify(events)).not.toContain('PRIVATE_NON_JSON_ERROR_BODY');
   });
 
   it('distinguishes malformed 2xx JSON without exposing response text or parse errors', async () => {
