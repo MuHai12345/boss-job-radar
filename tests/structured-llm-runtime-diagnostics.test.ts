@@ -228,10 +228,10 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
   it('maps a source mutation during provider await to source_changed and persists no stale analysis', async () => {
     const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
-    let runtime: LocalRuntime;
+    const runtimeHolder: { current: LocalRuntime | null } = { current: null };
     const provider = fakeProvider({
       async generate() {
-        runtime.database.observations.append(observation({
+        runtimeHolder.current!.database.observations.append(observation({
           capturedAt: new Date(Date.now() + 1_000).toISOString(),
           title: '更新后的岗位标题',
         }));
@@ -239,7 +239,8 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
         return validOutput();
       },
     });
-    runtime = await start(provider, events);
+    const runtime = await start(provider, events);
+    runtimeHolder.current = runtime;
     seed(runtime);
 
     expectGeneric502(await analyze(runtime));
