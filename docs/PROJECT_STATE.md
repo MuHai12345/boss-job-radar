@@ -6,16 +6,17 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 5A — PASS`（Lave8 relay adapter）
+- 最近完成批次：`Phase 6 / Batch 5B diagnostics repair — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一步：`Phase 6 / Batch 5B — representative real Lave8 evaluation v1`（验证批）
+- 下一步：恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation v1`（真实验证批）
 - Lave8 provider：`lave8`
 - Lave8 endpoint：`https://lave8.com/v1/responses`
 - Lave8 approved model：`gpt-6-astra`
-- Batch 5A Codex 产品实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
-- Batch 5A 窄修复：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`
-- Batch 5A 最终 CI run：`34201735884`
-- Batch 5A 最终自动化：**54 test files / 781 tests passed**
+- Batch 5A adapter repair：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`
+- Batch UX-1 Side Panel：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8` + repair `a270abd90363807f5139b0f698ec7c55a5457c27`
+- Batch 5B diagnostics 产品实现：`2697dc232716e50fb60722820716efb540eb21d4`
+- Batch 5B diagnostics 最终外部测试 head：`5880db94242849b5cc610d15e4e59cc8f5e45fd4`
+- Batch 5B diagnostics 最终 CI：`34215510564` — **54 test files / 762 tests passed**
 - 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
 - 当前产品实现阻塞：无
 - 当前验证门槛：至少 1 个真实 Lave8 browser → localhost → relay → strict validation → SQLite sample + 外部人工 grounding/业务可用性验收
@@ -37,7 +38,7 @@
 
 尚未整体验证：Capability 12–14。
 
-Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、popup explicit user trigger，以及独立 Lave8 relay adapter。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验证。
+Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、browser explicit user trigger、独立 Lave8 relay adapter、persistent Side Panel 入口，以及真实评测失败后的 secret-safe Lave8 / runtime stage diagnostics。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验收。
 
 ## Phase 6 / Batch 1 — PASS
 
@@ -114,7 +115,7 @@ Codex 产品实现：`9959cbf9a372509207ce3c78e29a800be6d39f03`
 - 50 秒 browser deadline；
 - zero automatic retry；
 - strict HTTP success/failure mapping；
-- popup explicit user trigger；
+- explicit user trigger；
 - remote-data/API-cost disclosure；
 - initialization 0 analysis calls；
 - click-time active-tab revalidation；
@@ -131,64 +132,85 @@ Codex 产品实现：`9959cbf9a372509207ce3c78e29a800be6d39f03`
 
 Codex 原始实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
 
-外部审阅与测试确认：
+验证：
 
 - 独立 `providerId = 'lave8'`；
 - fixed `https://lave8.com/v1/responses`；
 - only approved model `gpt-6-astra`；
 - Bearer key 只进入 Authorization；
-- 首版严格复用 Responses request/schema/parser contract；
+- 严格复用 Responses request/schema/parser contract；
 - 45 秒 bounded timeout；
 - zero retry / zero request-shape/model/endpoint fallback；
 - `BOSS_JOB_RADAR_LAVE8_API_KEY` / `BOSS_JOB_RADAR_LAVE8_MODEL`；
 - OpenAI 与 Lave8 不能同时配置；
-- popup disclosure 改为 provider-neutral。
+- provider-neutral remote-data/API-cost disclosure。
 
-首轮 CI 暴露一个真实产品回归：新增 Lave8 config 时改变了既有 OpenAI runtime-config result shape。外部 ChatGPT 给出窄 repair Prompt；Codex 修复：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`。
+首轮实现改变了既有 OpenAI runtime-config observable shape；窄修复 `6e858316ecfefb6e9c3552646cb3db7a437c93bd` 恢复兼容。
 
-修复后：
-
-- OpenAI 既有 observable config shape 恢复；
-- Lave8 继续使用显式 `provider: 'lave8'`；
-- Lave8 transport 未修改。
-
-最终 CI run：`34201735884`
-
-最终工程验证：
-
-- typecheck：PASS
-- lint：PASS
-- tests：PASS — **54 test files / 781 tests passed**
-- Lave8 transport focused：**14 / 14 passed**
-- Lave8 runtime config focused：**5 / 5 passed**
-- Chrome build：PASS
-- Edge build：PASS
-- local-service build：PASS
-- manifests：PASS
+最终 CI：`34201735884` — **54 test files / 781 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
 
 正式记录：`docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
 
-## Phase 6 / Batch 5B — 当前验证门槛
+## Phase 6 / Batch UX-1 — PASS
+
+为避免 popup 因网页误触关闭导致工作上下文丢失，主扩展体验迁移到 persistent browser Side Panel；popup 降级为轻量 launcher。
+
+已验证：
+
+- Side Panel 点击网页其他区域不消失；
+- `browser.storage.local` 只保留最小展示快照；
+- unsupported page 切换不清空上次结果；
+- BOSS 正常带 query/hash 的详情 URL 可 canonicalize 后用于 AI；
+- query/hash、`securityId`、`ka` 不进入 localhost analysis request / UI snapshot；
+- 已 VERIFIED 的显式岗位链接状态检查入口恢复；
+- link check 不自动触发；
+- Chrome / Edge MV3 side panel build 与新权限基线通过。
+
+产品实现：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8`；窄修复：`a270abd90363807f5139b0f698ec7c55a5457c27`。
+
+正式记录：`docs/verification/2026-09-08-phase-6-batch-ux-1-external-verification.md`
+
+## Phase 6 / Batch 5B diagnostics repair — PASS
+
+首次真实 Lave8 评测得到 generic `502 analysis_failed` 且无新持久化结果；该证据不足以判断是 key、relay、response contract、structured output、source state 或 persistence 问题，因此未做推测，也未自动重试。
+
+产品诊断实现：`2697dc232716e50fb60722820716efb540eb21d4`。
+
+外部验证确认：
+
+- Lave8 transport 固定安全事件：request / HTTP status / timeout / network / non-2xx / invalid JSON / response-contract summary / accepted；
+- non-2xx 只允许一次诊断性 JSON read，并把 `error.param` 映射到固定 allowlist；
+- response structural summary 只含固定 enums 与 bounded counts；
+- 不输出 raw provider body、raw error、prompt、JD、key、Authorization、IDs/metadata；
+- runtime 只输出固定 `invalid_source` / `provider_failed` / `output_validation_failed` / `source_changed` / `stored_analysis_invalid` / `internal_or_persistence` stage；
+- observer/callback 自身失败不改变 provider/HTTP 结果；
+- browser/server 继续 generic `502 analysis_failed`；
+- zero retry / zero fallback / max one fetch 保持；
+- startup/import/link/status/opportunity/health 仍为 0 provider calls。
+
+最终外部 CI：`34215510564`，head `5880db94242849b5cc610d15e4e59cc8f5e45fd4`：**54 test files / 762 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+
+正式记录：`docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
+
+## Phase 6 / Batch 5B — 当前真实验证门槛
 
 批准计划：`docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
 
-Batch 5B 是**验证批，不是产品编码批**。
-
-真实验证目标：
+Batch 5B 继续是**验证批，不是产品编码批**。安全诊断前置条件已经 PASS，现在恢复真实验证：
 
 1. 用户本机安全输入 Lave8 API key；
 2. local service 使用 `gpt-6-astra`，startup 仍为 0 relay calls；
-3. 用户在已保存且具有完整 JD 的真实 BOSS job detail page 主动点击一次 AI 分析；
+3. 用户在已保存且具有完整 JD 的真实 BOSS job detail page 主动点击一次 AI 分析；正常 query/hash URL 已支持；
 4. 一个 click 最多一个 localhost analysis POST、最多一个 relay provider request、0 automatic retries；
-5. 至少一个真实 result 通过现有 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
-6. 生成只包含所选 analysis 的 sanitized evaluation JSON；
+5. 成功时至少一个 result 通过 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
+6. 成功后生成只包含所选 analysis 的 sanitized `real-eval-sample.json`；
 7. 外部 ChatGPT 完成 grounding、业务可用性、secret/error/cost safety 人工验收。
+
+若再次失败：**不得自动重试**。Codex 只采集已经验证的 `BJR_LLM_DIAGNOSTIC` 固定安全事件与 analysis stage，交外部 ChatGPT 判断下一步；不得输出 raw provider body、API key、prompt、完整 JD、stack 或 SQLite detail。
 
 用户不是 CMD 测试执行器。本批允许 Codex 在不修改产品源码的前提下临时接管本机 Git/build/local-service/SQLite/导出工作。用户只保留 secure local key entry、必要的 extension Reload，以及最终一次显式分析点击。
 
-如果真实 relay 暴露具体 request/response 兼容问题：`CHANGES_REQUIRED`，外部 ChatGPT 再生成窄 repair Prompt。
-
-只有 Batch 5B 真实 provider 评测通过后，才能考虑：
+只有真实 provider 评测通过后，才能考虑：
 
 - Capability 12 → `VERIFIED`
 - Phase 6 → `PASS`
