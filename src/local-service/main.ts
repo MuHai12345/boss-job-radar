@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { createOpenAiStructuredLlmProvider } from '../domain/llm/openai-structured-llm-provider.js';
-import { createLave8StructuredLlmProvider } from '../domain/llm/lave8-structured-llm-provider.js';
+import { createLave8StructuredLlmProvider, type Lave8StructuredLlmDiagnosticEvent } from '../domain/llm/lave8-structured-llm-provider.js';
 import {
   BOSS_JOB_RADAR_OPENAI_API_KEY_ENV,
   BOSS_JOB_RADAR_OPENAI_MODEL_ENV,
@@ -17,9 +17,13 @@ import {
   ensureProductionDataDirectory,
   resolveProductionDataPaths,
 } from './production-data-path.js';
-import { startLocalRuntime } from './runtime.js';
+import { startLocalRuntime, type StructuredLlmAnalysisDiagnosticEvent } from './runtime.js';
 import { LOCAL_SERVICE_HOST } from './server.js';
 import { formatStartupError } from './startup-error.js';
+
+function logStructuredLlmDiagnostic(event: Lave8StructuredLlmDiagnosticEvent | StructuredLlmAnalysisDiagnosticEvent): void {
+  console.log(`BJR_LLM_DIAGNOSTIC ${JSON.stringify(event)}`);
+}
 
 const homeDirectory = homedir();
 const openAiApiKey = process.env[BOSS_JOB_RADAR_OPENAI_API_KEY_ENV];
@@ -41,7 +45,7 @@ try {
   );
   const structuredLlmProvider = llmConfig.enabled
     ? 'provider' in llmConfig && llmConfig.provider === 'lave8'
-      ? createLave8StructuredLlmProvider(llmConfig)
+      ? createLave8StructuredLlmProvider({ ...llmConfig, onDiagnostic: logStructuredLlmDiagnostic })
       : createOpenAiStructuredLlmProvider(llmConfig)
     : undefined;
   const port = parseProductionPort(process.env[LOCAL_SERVICE_PORT_ENV]);
@@ -62,6 +66,7 @@ try {
   const runtime = await startLocalRuntime({
     databasePath: productionDataPaths.databasePath,
     port,
+    onStructuredLlmDiagnostic: logStructuredLlmDiagnostic,
     ...(structuredLlmProvider === undefined ? {} : { structuredLlmProvider }),
   });
 

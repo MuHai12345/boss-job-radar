@@ -1,5 +1,11 @@
 import { OPENAI_STRUCTURED_LLM_OUTPUT_SCHEMA } from './openai-structured-llm-output-schema.js';
 import type { StructuredLlmProvider, StructuredLlmProviderRequest } from './structured-llm-provider.js';
+import {
+  emitDiagnosticSafely, safeLave8RequestParameter, summarizeLave8Response,
+  type Lave8RequestParameter, type Lave8StructuredLlmDiagnosticEvent,
+} from './lave8-structured-llm-diagnostics.js';
+
+export type { Lave8StructuredLlmDiagnosticEvent } from './lave8-structured-llm-diagnostics.js';
 
 export const LAVE8_STRUCTURED_LLM_TIMEOUT_MS = 45_000;
 export const LAVE8_STRUCTURED_LLM_ENDPOINT = 'https://lave8.com/v1/responses';
@@ -9,6 +15,7 @@ export interface Lave8StructuredLlmProviderOptions {
   readonly apiKey: string;
   readonly modelId: string;
   readonly fetchImpl?: typeof fetch;
+  readonly onDiagnostic?: (event: Lave8StructuredLlmDiagnosticEvent) => void;
 }
 
 function failed(): never { throw new Error('Structured LLM provider failed'); }
@@ -59,7 +66,7 @@ function parseResponse(value: unknown): unknown {
 
 export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProviderOptions): StructuredLlmProvider {
   try {
-    const { apiKey, modelId, fetchImpl = globalThis.fetch } = options;
+    const { apiKey, modelId, fetchImpl = globalThis.fetch, onDiagnostic } = options;
     if (typeof apiKey !== 'string' || apiKey.trim().length === 0 || /\p{Cc}/u.test(apiKey)
       || typeof modelId !== 'string' || !LAVE8_STRUCTURED_LLM_MODEL_IDS.some((allowed) => allowed === modelId)
       || typeof fetchImpl !== 'function') {
@@ -77,10 +84,11 @@ export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProv
             timer = setTimeout(() => {
               reject(new Error('Structured LLM provider failed'));
               controller.abort();
+              emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'timeout' });
             }, LAVE8_STRUCTURED_LLM_TIMEOUT_MS);
           });
           const send = async (): Promise<unknown> => {
-            const response = await fetchImpl(LAVE8_STRUCTURED_LLM_ENDPOINT, {
+            const init: RequestInit = {
               method: 'POST',
               redirect: 'error',
               credentials: 'omit',
@@ -103,11 +111,53 @@ export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProv
                   },
                 },
               }),
-            });
-            if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) failed();
-            const body: unknown = await response.json();
+            };
+            emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'request_started' });
+            let response: Response;
+            try {
+              response = await fetchImpl(LAVE8_STRUCTURED_LLM_ENDPOINT, init);
+            } catch {
+              if (!controller.signal.aborted) {
+                emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'network_failure' });
+              }
+              return failed();
+            }
             if (controller.signal.aborted) failed();
-            return parseResponse(body);
+            const status = response.status;
+            if (!Number.isInteger(status)) failed();
+            emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'http_response', status });
+            if (status < 200 || status >= 300) {
+              let requestParameter: Lave8RequestParameter = 'unknown';
+              try {
+                requestParameter = safeLave8RequestParameter(await response.json());
+              } catch {
+                // A non-JSON error body provides no approved parameter metadata.
+              }
+              if (controller.signal.aborted) failed();
+              emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'http_non_2xx', status, requestParameter });
+              return failed();
+            }
+            let body: unknown;
+            try {
+              body = await response.json();
+            } catch {
+              if (!controller.signal.aborted) {
+                emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'response_json_invalid' });
+              }
+              return failed();
+            }
+            if (controller.signal.aborted) failed();
+            let parsed: unknown;
+            try {
+              parsed = parseResponse(body);
+            } catch {
+              emitDiagnosticSafely(onDiagnostic, {
+                scope: 'lave8', event: 'response_contract_invalid', summary: summarizeLave8Response(body),
+              });
+              return failed();
+            }
+            emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'response_accepted' });
+            return parsed;
           };
           // Bound both fetch and body reading, even when an injected transport
           // ignores abort. There is exactly one send and no retry or fallback.
