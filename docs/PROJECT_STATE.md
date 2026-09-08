@@ -6,15 +6,19 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 4 — PASS`
+- 最近完成批次：`Phase 6 / Batch 5A — PASS`（Lave8 relay adapter）
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一步：`Phase 6 / Batch 5 — representative real OpenAI evaluation v1`（验证批，等待用户明确同意）
-- Batch 4 Codex 产品实现 commit：`9959cbf9a372509207ce3c78e29a800be6d39f03`
-- Batch 4 最终外部测试 head：`e276ed7c1265719117210482106ea24dd45352d4`
-- Batch 4 最终 CI run：`34185674592`
+- 下一步：`Phase 6 / Batch 5B — representative real Lave8 evaluation v1`（验证批）
+- Lave8 provider：`lave8`
+- Lave8 endpoint：`https://lave8.com/v1/responses`
+- Lave8 approved model：`gpt-6-astra`
+- Batch 5A Codex 产品实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
+- Batch 5A 窄修复：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`
+- Batch 5A 最终 CI run：`34201735884`
+- Batch 5A 最终自动化：**54 test files / 781 tests passed**
 - 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
 - 当前产品实现阻塞：无
-- 当前验证门槛：用户明确同意真实 OpenAI 远程调用/API 费用 + 代表性真实 provider 评测
+- 当前验证门槛：至少 1 个真实 Lave8 browser → localhost → relay → strict validation → SQLite sample + 外部人工 grounding/业务可用性验收
 
 ## 已验证核心能力
 
@@ -33,207 +37,172 @@
 
 尚未整体验证：Capability 12–14。
 
-Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、popup explicit user trigger。整体仍为 `IN_PROGRESS`，因为代表性真实 OpenAI provider end-to-end 评测与用户人工抽查尚未完成。
+Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、popup explicit user trigger，以及独立 Lave8 relay adapter。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验证。
 
-## Phase 6 / Batch 1 验收
+## Phase 6 / Batch 1 — PASS
 
-Batch 1 建立并验证：
+建立并验证：
 
 - `StructuredLlmProvider` 抽象；
-- 最小化 LLM input snapshot；
-- 完整 JD 与 authoritative upstream structured facts 输入边界；
+- 最小化 input snapshot；
+- 完整 JD + authoritative upstream structured facts 输入边界；
 - prompt injection / delimiter 防线；
-- 固定 prompt/output schema version；
-- exact-shape structured output validator；
+- strict structured output validator；
 - full-JD substring / upstream evidence grounding；
 - schema v8 `structured_llm_analyses`；
 - provider/model/source-state append-only history；
 - same-state idempotency；
 - provider call outside SQLite transaction；
 - source-change race rejection；
-- provider failure / invalid output / stored corruption fail closed；
-- missing complete JD 时不调用 provider。
+- missing complete JD 时 0 provider calls。
 
 正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
 
-## Phase 6 / Batch 2 验收
+## Phase 6 / Batch 2 — PASS
 
 Codex 产品实现：`34aaa1b1d23fb5f7b729f006436ed4816f381dd3`
 
-最终外部测试 head：`9e37abd303d34823f87e41ef1044df113ce2f0d6`
-
-最终 CI run：`34134533838`
-
-Batch 2 验证：
+验证：
 
 - OpenAI Responses concrete provider；
 - explicit approved model allowlist；
 - API key constructor-only secret boundary；
-- fixed `https://api.openai.com/v1/responses`；
-- Node native fetch；
-- system / user prompt separation；
-- `store:false` / `background:false` / `stream:false`；
-- reasoning low / `max_output_tokens=4000`；
-- Structured Outputs `json_schema` + strict；
-- completed-only single assistant `output_text` parsing；
-- refusal/incomplete/failed/queued/malformed/non-2xx fail closed；
-- 45 秒 timeout + AbortController；
+- fixed official Responses endpoint；
+- system/user prompt separation；
+- strict Structured Outputs JSON Schema；
+- completed-only output parser；
+- refusal/incomplete/failed/malformed/non-2xx fail closed；
+- 45 秒 timeout；
 - zero retry / zero fallback。
 
 最终：**49 test files / 697 tests passed**，typecheck/lint/build/manifests 全部 PASS。
 
 正式记录：`docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
 
-## Phase 6 / Batch 3 验收
+## Phase 6 / Batch 3 — PASS
 
-Codex 产品实现：
+Codex 产品实现：`95ecbed47598378cb402a89757bf17d9e8327c64`
 
-`95ecbed47598378cb402a89757bf17d9e8327c64`
+验证：
 
-外部 ChatGPT 审阅真实 diff 后没有发现需要 Codex repair 的产品缺陷。
-
-Batch 3 新增并验证：
-
-- 产品专用 `BOSS_JOB_RADAR_OPENAI_API_KEY` / `BOSS_JOB_RADAR_OPENAI_MODEL`；
-- 两者都缺失时 disabled-by-default；
-- partial / blank / control-character / invalid-model config fail closed；
-- OpenAI key startup-error sanitization；
-- runtime optional `StructuredLlmProvider`；
-- provider construction/startup/database open 不产生远程调用；
-- exact canonical `{jobUrl}` structured LLM request contract；
+- product-specific local key/model config；
+- disabled-by-default / partial-invalid fail closed；
+- startup secret sanitization；
+- runtime optional provider；
 - protected `POST /structured-llm-analyses`；
-- loopback Host / extension Origin / bridge token / JSON content type / supported content encoding / 1 MiB body limit；
-- server narrow writer，不持有 database/OpenAI secret；
-- job URL → local Job → existing structured LLM repository；
-- provider not configured / job not found / missing JD / success / generic failure fixed HTTP contract；
-- success 只返回 persisted analysis id；
-- provider/invalid output/source race/persistence error 不向客户端泄露内部细节；
-- startup/import/link/status/opportunity/health/session 均保持 0 provider calls；
-- same provider/model/source-state 的重复显式触发继续复用已有结果。
+- exact canonical `jobUrl` request；
+- loopback Host / extension Origin / bridge token / media type / encoding / body limit；
+- id-only success；
+- generic error hygiene；
+- startup/import/link/status/opportunity/health/session 0 provider calls；
+- same-state explicit-trigger idempotency。
 
-最终外部测试 head：
-
-`ee82ee52c24763470cfdf6f2de9504e139989405`
-
-最终 CI run：
-
-`34137913888`
-
-最终工程验证：
-
-- `npm run typecheck`：PASS
-- `npm run lint`：PASS
-- `npm test`：PASS — **50 test files / 714 tests passed**
-- Batch 3 专项：**17 / 17 passed**
-- Chrome / Edge / local build：PASS
-- manifest verification：PASS
-
-本批没有真实 OpenAI 请求，不读取用户真实 API key，不产生真实模型费用，也没有 popup/browser analyze action。
+最终：**50 test files / 714 tests passed**。
 
 正式记录：`docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
 
-## Phase 6 / Batch 4 验收
+## Phase 6 / Batch 4 — PASS
 
-批准设计：
+Codex 产品实现：`9959cbf9a372509207ce3c78e29a800be6d39f03`
 
-`docs/decisions/ADR-0018-popup-explicit-structured-llm-trigger-v1.md`
+验证：
 
-Codex 产品实现：
-
-`9959cbf9a372509207ce3c78e29a800be6d39f03`
-
-产品 diff 只涉及：
-
-- `src/bridge/local-service-client.ts`
-- `entrypoints/popup/structured-llm-analysis-controller.ts`
-- `entrypoints/popup/index.html`
-- `entrypoints/popup/main.ts`
-- `entrypoints/popup/style.css`
-
-外部代码审阅没有发现需要 Codex repair 的产品缺陷。
-
-Batch 4 新增并验证：
-
-- 独立 structured LLM browser localhost client；
-- network 前 exact canonical request validation；
-- 每次独立分析动作 fresh protocol-2 bridge session；
-- 固定 `/structured-llm-analyses` endpoint；
-- browser POST body 只有 `jobUrl`；
-- browser 不读取/持有 API key、model、完整 JD；
-- analysis POST 独立 50 秒 bounded timeout，覆盖 response body consumption；
-- analysis POST **0 automatic retries**；
-- strict HTTP 200 exact positive safe-integer `{id}`；
-- 400/403/404/413/422/502/503 固定本地 failure mapping；
-- non-200 body 不反射到 UI；
-- popup `AI 岗位分析` 显式用户动作；
-- 完整 JD + 最小化上下文远程发送与 OpenAI API 费用透明披露；
-- popup initialization 0 analysis calls；
-- canonical detail URL visibility；
+- structured LLM browser localhost client；
+- fresh bridge session per action；
+- browser body 只有 `jobUrl`；
+- browser 不接触 API key/model/full JD；
+- 50 秒 browser deadline；
+- zero automatic retry；
+- strict HTTP success/failure mapping；
+- popup explicit user trigger；
+- remote-data/API-cost disclosure；
+- initialization 0 analysis calls；
 - click-time active-tab revalidation；
-- in-flight duplicate click guard；
-- finally fresh-tab restore / lookup failure fail closed；
-- success 只显示结果已保存，不显示 analysis JSON/id；
-- 没有新增 browser permission、API key UI、model selector、Dashboard 或 Capability 13。
+- in-flight duplicate guard；
+- fresh-final-tab fail closed restore。
 
-Codex 产品 commit 自己的原始 CI run `34183316291` 已经 `success`。
-
-外部网页版 ChatGPT 随后新增：
-
-- `tests/structured-llm-browser-client.test.ts` — 29 tests
-- `tests/structured-llm-analysis-controller.test.ts` — 19 tests
-
-Batch 4 专项：**48 / 48 passed**。
-
-最终外部测试 head：
-
-`e276ed7c1265719117210482106ea24dd45352d4`
-
-最终 CI run：
-
-`34185674592`
-
-最终工程验证：
-
-- `npm ci`：PASS
-- `npm run typecheck`：PASS
-- `npm run lint`：PASS
-- `npm test`：PASS — **52 test files / 762 tests passed**
-- `npm run build`：PASS
-- `npm run build:edge`：PASS
-- `npm run build:local`：PASS
-- `npm run verify:manifests`：PASS
-
-Batch 4 没有读取用户真实 API key、没有访问 OpenAI、没有产生真实 API 费用。真实浏览器中的实际 provider 点击路径与代表性真实模型评测合并到 Batch 5 一次完成，避免重复要求用户做本机人工操作。
+最终：**52 test files / 762 tests passed**；Batch 4 专项 **48 / 48 passed**。
 
 正式记录：`docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
 
-## Phase 6 / Batch 5 验证门槛
+## Phase 6 / Batch 5A — PASS
 
-批准计划：
+用户明确选择第三方 Lave8 relay，而不是官方 OpenAI endpoint。
 
-`docs/decisions/ADR-0019-representative-real-openai-evaluation-v1.md`
+Codex 原始实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
 
-Batch 5 是**验证批，不是预设 Codex 产品编码批**。
+外部审阅与测试确认：
 
-进入前必须由用户明确同意：
+- 独立 `providerId = 'lave8'`；
+- fixed `https://lave8.com/v1/responses`；
+- only approved model `gpt-6-astra`；
+- Bearer key 只进入 Authorization；
+- 首版严格复用 Responses request/schema/parser contract；
+- 45 秒 bounded timeout；
+- zero retry / zero request-shape/model/endpoint fallback；
+- `BOSS_JOB_RADAR_LAVE8_API_KEY` / `BOSS_JOB_RADAR_LAVE8_MODEL`；
+- OpenAI 与 Lave8 不能同时配置；
+- popup disclosure 改为 provider-neutral。
 
-- 将选定岗位完整 JD + 已批准最小上下文通过本地服务发送给 OpenAI；
-- 可能产生 OpenAI API 费用；
-- API key 只配置在用户本机 local-service process，不粘贴给 ChatGPT/Codex/GitHub；
-- 每次 provider request 仍由用户主动点击，zero automatic retry。
+首轮 CI 暴露一个真实产品回归：新增 Lave8 config 时改变了既有 OpenAI runtime-config result shape。外部 ChatGPT 给出窄 repair Prompt；Codex 修复：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`。
 
-代表性评测至少覆盖真实 end-to-end 成功路径，并逐步覆盖适合转行、经验硬门槛、职责模糊/疑似伪运营等自然样本。外部 ChatGPT负责把实际问题区分为产品缺陷、模型能力限制、样本信息不足或可接受表现。
+修复后：
 
-如果真实评测发现产品缺陷，再生成一个窄 repair Prompt 给 Codex；如果没有产品缺陷且评测通过，才考虑 `Capability 12 → VERIFIED`、`Phase 6 → PASS`，然后进入 Phase 7 / Capability 13。
+- OpenAI 既有 observable config shape 恢复；
+- Lave8 继续使用显式 `provider: 'lave8'`；
+- Lave8 transport 未修改。
+
+最终 CI run：`34201735884`
+
+最终工程验证：
+
+- typecheck：PASS
+- lint：PASS
+- tests：PASS — **54 test files / 781 tests passed**
+- Lave8 transport focused：**14 / 14 passed**
+- Lave8 runtime config focused：**5 / 5 passed**
+- Chrome build：PASS
+- Edge build：PASS
+- local-service build：PASS
+- manifests：PASS
+
+正式记录：`docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
+
+## Phase 6 / Batch 5B — 当前验证门槛
+
+批准计划：`docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
+
+Batch 5B 是**验证批，不是产品编码批**。
+
+真实验证目标：
+
+1. 用户本机安全输入 Lave8 API key；
+2. local service 使用 `gpt-6-astra`，startup 仍为 0 relay calls；
+3. 用户在已保存且具有完整 JD 的真实 BOSS job detail page 主动点击一次 AI 分析；
+4. 一个 click 最多一个 localhost analysis POST、最多一个 relay provider request、0 automatic retries；
+5. 至少一个真实 result 通过现有 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
+6. 生成只包含所选 analysis 的 sanitized evaluation JSON；
+7. 外部 ChatGPT 完成 grounding、业务可用性、secret/error/cost safety 人工验收。
+
+用户不是 CMD 测试执行器。本批允许 Codex 在不修改产品源码的前提下临时接管本机 Git/build/local-service/SQLite/导出工作。用户只保留 secure local key entry、必要的 extension Reload，以及最终一次显式分析点击。
+
+如果真实 relay 暴露具体 request/response 兼容问题：`CHANGES_REQUIRED`，外部 ChatGPT 再生成窄 repair Prompt。
+
+只有 Batch 5B 真实 provider 评测通过后，才能考虑：
+
+- Capability 12 → `VERIFIED`
+- Phase 6 → `PASS`
+- 进入 Phase 7 / Capability 13
 
 ## 协作与测试规则
 
 长期分工以 `AGENTS.md` 为准：
 
 - Codex：只负责外部 Prompt 指定的产品源码、必要 migration、commit、push。
-- Codex 不新增或修改测试，不运行测试/typecheck/lint/build/manifest verification，不做 QA 或验收。
+- Codex 默认不新增或修改测试，不运行测试/typecheck/lint/build/manifest verification，不做 QA 或验收。
 - 外部网页版 ChatGPT：负责全部测试代码、CI、代码审阅、验证、验收和状态文档。
-- 用户不是 CMD 测试执行器；仅在无法远程复现的真实登录 BOSS 浏览器或真实 provider 场景下执行最少量人工验证。
+- 用户不是 CMD 测试执行器；仅在真实登录 BOSS 浏览器或真实 provider 场景执行不可替代的最少量人工动作。
+- Batch 5B 的本机验证环境操作是一次明确例外，不改变长期角色分工。
 
 ## 长期产品边界
 
