@@ -41,21 +41,22 @@ afterEach(() => {
 });
 
 describe('structured LLM popup disclosure and wiring', () => {
-  it('shows the explicit remote-data and API-cost disclosure required by the approved contract', () => {
+  it('shows provider-neutral remote-data and API-cost disclosure', () => {
     const document = createDocument();
     const value = controls(document);
     const text = value.action.textContent ?? '';
 
     expect(value.action.hidden).toBe(true);
     expect(value.button.disabled).toBe(true);
-    expect(value.button.textContent).toContain('发送到 OpenAI 并分析当前岗位');
+    expect(value.button.textContent).toContain('发送到已配置的 AI 服务并分析当前岗位');
     for (const requiredText of [
-      '只有点击下方按钮后才会分析',
+      '只有点击下方按钮后才会发送并分析',
       '完整 JD',
       '最小化岗位上下文',
-      'OpenAI 模型',
-      'OpenAI API 费用',
+      '远程 AI 服务或中转站',
+      'API 费用',
       '先把当前岗位保存到本地',
+      '浏览器不会携带 API key',
       'companyName',
       'jobUrl',
       'rawText',
@@ -65,7 +66,8 @@ describe('structured LLM popup disclosure and wiring', () => {
       expect(text).toContain(requiredText);
     }
     expect(text).toContain('岗位链接仅用于向本地服务指定当前岗位');
-    expect(text).toContain('作为 OpenAI provider 输入发送');
+    expect(text).toContain('作为 AI provider 输入发送');
+    expect(text).not.toContain('发送到 OpenAI 并分析当前岗位');
   });
 
   it('wires the controller only to active-tab metadata and the narrow local analysis client', () => {
@@ -77,6 +79,7 @@ describe('structured LLM popup disclosure and wiring', () => {
     expect(controllerSource).not.toContain('apiKey');
     expect(controllerSource).not.toContain('modelId');
     expect(controllerSource).not.toContain('BOSS_JOB_RADAR_OPENAI_API_KEY');
+    expect(controllerSource).not.toContain('BOSS_JOB_RADAR_LAVE8_API_KEY');
   });
 });
 
