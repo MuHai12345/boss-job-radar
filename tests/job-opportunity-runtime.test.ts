@@ -13,6 +13,7 @@ import type { JobObservationInput } from '../src/shared/job-observation-types';
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>
@@ -79,6 +80,9 @@ function request(
 
 describe('opportunity runtime backfill', () => {
   it('backfills a missing current opportunity after upstream data already exists', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-07T10:00:00.000Z'));
+
     const databasePath = await temporaryDatabasePath();
     const seed = openLocalDatabase({ path: databasePath });
     try {
