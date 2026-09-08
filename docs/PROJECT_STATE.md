@@ -6,20 +6,21 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 5B diagnostics repair — PASS`
+- 最近完成批次：`Phase 6 / Batch 5B pre-retry diagnostics V2 — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一步：恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation v1`（真实验证批）
+- 下一步：恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation`，只允许一次新的用户显式真实调用
 - Lave8 provider：`lave8`
 - Lave8 endpoint：`https://lave8.com/v1/responses`
 - Lave8 approved model：`gpt-6-astra`
 - Batch 5A adapter repair：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`
 - Batch UX-1 Side Panel：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8` + repair `a270abd90363807f5139b0f698ec7c55a5457c27`
 - Batch 5B diagnostics 产品实现：`2697dc232716e50fb60722820716efb540eb21d4`
-- Batch 5B diagnostics 最终外部测试 head：`5880db94242849b5cc610d15e4e59cc8f5e45fd4`
-- Batch 5B diagnostics 最终 CI：`34215510564` — **54 test files / 762 tests passed**
+- Batch 5B pre-retry diagnostics V2 产品实现：`0a0c357569947fe8c03aa1570344a4656df7f15a`
+- Batch 5B pre-retry diagnostics V2 最终外部测试 head：`3738ef14df85a66f4dfbbffee3ca6206d207b884`
+- Batch 5B pre-retry diagnostics V2 最终 CI：`34219631874` — **56 test files / 769 tests passed**
 - 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
-- 当前产品实现阻塞：无
-- 当前验证门槛：至少 1 个真实 Lave8 browser → localhost → relay → strict validation → SQLite sample + 外部人工 grounding/业务可用性验收
+- 当前产品实现阻塞：无；真实 relay 兼容性仍未通过
+- 当前验证门槛：至少 1 个真实 Lave8 browser → localhost → relay → strict validation → SQLite sample + 外部人工 grounding/业务可用性验收；下一次真实评测必须同时比较 `analysis_http/request_accepted` 与 `lave8/request_started` 数量
 
 ## 已验证核心能力
 
@@ -38,7 +39,7 @@
 
 尚未整体验证：Capability 12–14。
 
-Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、browser explicit user trigger、独立 Lave8 relay adapter、persistent Side Panel 入口，以及真实评测失败后的 secret-safe Lave8 / runtime stage diagnostics。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验收。
+Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、browser explicit user trigger、独立 Lave8 relay adapter、persistent Side Panel、secret-safe Lave8/runtime diagnostics，以及真实评测请求数量与 non-2xx 固定类别诊断。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验收。
 
 ## Phase 6 / Batch 1 — PASS
 
@@ -192,29 +193,59 @@ Codex 原始实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
 
 正式记录：`docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
 
+## Phase 6 / Batch 5B pre-retry diagnostics V2 — PASS
+
+后续真实评测在单次授权窗口中观察到 **3 个 `lave8/request_started`**，但当时无法确认究竟有多少个 localhost analysis request 通过了安全边界；与此同时首次 provider response 为 HTTP 400，但 `requestParameter=unknown`，因此仍不允许把三次请求断言为自动 retry，也不允许根据 400 盲删请求参数。
+
+Codex 产品实现：`0a0c357569947fe8c03aa1570344a4656df7f15a`。
+
+外部验证确认：
+
+- `/structured-llm-analyses` 在完整验证通过且即将调用 writer 前 emit `analysis_http/request_accepted`；
+- 每个 accepted request 分配 process-local positive ordinal，完成后以同 ordinal emit固定 `result` outcome；
+- invalid、unauthenticated、malformed、unconfigured request 不会 emit accepted；
+- analysis HTTP diagnostic 不含 URL/body/token/headers/prompt/JD/error/DB detail；
+- Lave8 safe `requestParameter` 扩展覆盖 `model`、`reasoning.effort`、`text.format.*` 等实际发送字段；
+- non-2xx 只输出固定 body-structure / error-type / error-code categories；
+- raw provider message/type/code/param/body 仍不输出；
+- Side Panel 失败提示明确手动再点属于新的分析尝试，可能再次产生远程请求/API 费用；
+- request shape、endpoint、model、timeout、zero retry/fallback 均未改变。
+
+原产品 commit 的首次 CI `34219279131` 因旧 test type baseline 未包含新增 callback 而在 typecheck 失败；外部 ChatGPT 更新测试基线并新增诊断测试后，最终 head `3738ef14df85a66f4dfbbffee3ca6206d207b884`、CI `34219631874`：**56 test files / 769 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+
+正式记录：`docs/verification/2026-09-08-phase-6-batch-5b-pre-retry-diagnostics-v2-external-verification.md`
+
 ## Phase 6 / Batch 5B — 当前真实验证门槛
 
 批准计划：`docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
 
-Batch 5B 继续是**验证批，不是产品编码批**。安全诊断前置条件已经 PASS，现在恢复真实验证：
+Batch 5B 继续是**验证批，不是产品编码批**。下一次只允许一次新的用户显式真实调用：
 
 1. 用户本机安全输入 Lave8 API key；
 2. local service 使用 `gpt-6-astra`，startup 仍为 0 relay calls；
 3. 用户在已保存且具有完整 JD 的真实 BOSS job detail page 主动点击一次 AI 分析；正常 query/hash URL 已支持；
-4. 一个 click 最多一个 localhost analysis POST、最多一个 relay provider request、0 automatic retries；
-5. 成功时至少一个 result 通过 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
-6. 成功后生成只包含所选 analysis 的 sanitized `real-eval-sample.json`；
-7. 外部 ChatGPT 完成 grounding、业务可用性、secret/error/cost safety 人工验收。
+4. 必须同时记录 `analysis_http/request_accepted` count/ordinals 和 `lave8/request_started` count；
+5. 一个 click 预期最多一个 accepted localhost analysis request、最多一个 relay provider request、0 automatic retries；
+6. 若 accepted localhost count > 1，先调查 browser/Side Panel 重复触发；若 accepted count = 1 但 provider request_started > 1，先调查 localhost/repository/provider 链路；不得自动重试；
+7. 若出现 HTTP 400，只依据 fixed safe `requestParameter` / error category 决定是否已有明确 relay compatibility evidence，没有证据则不盲改；
+8. 成功时至少一个 result 通过 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
+9. 成功后生成只包含所选 analysis 的 sanitized `real-eval-sample.json`；
+10. 外部 ChatGPT 完成 grounding、业务可用性、secret/error/cost safety 人工验收。
 
-若再次失败：**不得自动重试**。Codex 只采集已经验证的 `BJR_LLM_DIAGNOSTIC` 固定安全事件与 analysis stage，交外部 ChatGPT 判断下一步；不得输出 raw provider body、API key、prompt、完整 JD、stack 或 SQLite detail。
-
-用户不是 CMD 测试执行器。本批允许 Codex 在不修改产品源码的前提下临时接管本机 Git/build/local-service/SQLite/导出工作。用户只保留 secure local key entry、必要的 extension Reload，以及最终一次显式分析点击。
+用户不是 CMD 测试执行器。本批允许 Codex 在不修改产品源码的前提下临时接管本机 Git/build/local-service/SQLite/安全日志/导出工作。用户只保留 secure local key entry、必要的 extension Reload，以及最终一次显式分析点击。
 
 只有真实 provider 评测通过后，才能考虑：
 
 - Capability 12 → `VERIFIED`
 - Phase 6 → `PASS`
 - 进入 Phase 7 / Capability 13
+
+## 已确认但尚未修复的 Side Panel UX 问题
+
+真实评测期间还确认了两个独立 UX 缺口，它们不与当前 Lave8 兼容性修复混批：
+
+- 搜索结果页列表薪资可能携带依赖网页字体的 PUA 字符；当前 Side Panel 直接显示 extraction `salaryText`，尚未消费已经 VERIFIED 的可信 salary decoding result，也没有在不可可信解码时显示明确未知状态。
+- persistent Side Panel 跨新标签页保留，但 manifest 当前使用 `activeTab` 且没有 BOSS 持续 host permission；新 tab 不继承旧 tab 的临时授权，导致用户可能需要重新点击工具栏扩展才能注入解析。后续应单独设计最小权限 UX，不扩大到 `<all_urls>`。
 
 ## 协作与测试规则
 
