@@ -6,14 +6,15 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 3 — PASS`
+- 最近完成批次：`Phase 6 / Batch 4 — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一批：`Phase 6 / Batch 4 — popup explicit structured LLM analysis trigger v1`
-- Batch 3 Codex 产品实现 commit：`95ecbed47598378cb402a89757bf17d9e8327c64`
-- Batch 3 最终外部测试 head：`ee82ee52c24763470cfdf6f2de9504e139989405`
-- Batch 3 最终 CI run：`34137913888`
+- 下一步：`Phase 6 / Batch 5 — representative real OpenAI evaluation v1`（验证批，等待用户明确同意）
+- Batch 4 Codex 产品实现 commit：`9959cbf9a372509207ce3c78e29a800be6d39f03`
+- Batch 4 最终外部测试 head：`e276ed7c1265719117210482106ea24dd45352d4`
+- Batch 4 最终 CI run：`34185674592`
 - 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
-- 当前实现阻塞：无
+- 当前产品实现阻塞：无
+- 当前验证门槛：用户明确同意真实 OpenAI 远程调用/API 费用 + 代表性真实 provider 评测
 
 ## 已验证核心能力
 
@@ -32,7 +33,7 @@
 
 尚未整体验证：Capability 12–14。
 
-Capability 12 已连续完成并外部验收 provider-neutral foundation、OpenAI Responses transport、本地 opt-in config 与 protected localhost explicit trigger；整体仍为 `IN_PROGRESS`，因为浏览器显式用户动作和代表性真实 OpenAI 模型评测尚未完成。
+Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、popup explicit user trigger。整体仍为 `IN_PROGRESS`，因为代表性真实 OpenAI provider end-to-end 评测与用户人工抽查尚未完成。
 
 ## Phase 6 / Batch 1 验收
 
@@ -73,7 +74,7 @@ Batch 2 验证：
 - system / user prompt separation；
 - `store:false` / `background:false` / `stream:false`；
 - reasoning low / `max_output_tokens=4000`；
-- Structured Outputs `json_schema` + `strict:true`；
+- Structured Outputs `json_schema` + strict；
 - completed-only single assistant `output_text` parsing；
 - refusal/incomplete/failed/queued/malformed/non-2xx fail closed；
 - 45 秒 timeout + AbortController；
@@ -110,10 +111,6 @@ Batch 3 新增并验证：
 - startup/import/link/status/opportunity/health/session 均保持 0 provider calls；
 - same provider/model/source-state 的重复显式触发继续复用已有结果。
 
-Codex 产品提交后的原始 CI 只暴露一个旧测试类型基线没有跟上新增 optional server writer；外部 ChatGPT 修正了测试基线。
-
-外部 ChatGPT 随后新增 17 个 Batch 3 专项测试。专项测试第一轮唯一失败是外部测试自己使用了不符合既有 UUIDv4 contract 的 `clientImportId`；修正测试输入后未修改任何产品源码。
-
 最终外部测试 head：
 
 `ee82ee52c24763470cfdf6f2de9504e139989405`
@@ -124,42 +121,110 @@ Codex 产品提交后的原始 CI 只暴露一个旧测试类型基线没有跟�
 
 最终工程验证：
 
-- `npm ci`：PASS
 - `npm run typecheck`：PASS
 - `npm run lint`：PASS
 - `npm test`：PASS — **50 test files / 714 tests passed**
 - Batch 3 专项：**17 / 17 passed**
-- `npm run build`：PASS
-- `npm run build:edge`：PASS
-- `npm run build:local`：PASS
-- `npm run verify:manifests`：PASS
+- Chrome / Edge / local build：PASS
+- manifest verification：PASS
 
 本批没有真实 OpenAI 请求，不读取用户真实 API key，不产生真实模型费用，也没有 popup/browser analyze action。
 
 正式记录：`docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
 
-## Phase 6 / Batch 4 方向
+## Phase 6 / Batch 4 验收
 
 批准设计：
 
 `docs/decisions/ADR-0018-popup-explicit-structured-llm-trigger-v1.md`
 
-下一批只把已经验证的 localhost analysis endpoint 接到**popup 中一个透明、明确、用户主动点击的动作**：
+Codex 产品实现：
 
-- 新 browser local-service client；
-- 每次点击 fresh protocol-2 bridge session；
-- 分析 POST 使用独立的约 50 秒有界 timeout；
-- **0 automatic retries**，避免未知网络结果导致潜在重复付费调用；
-- browser request body 仍只有 canonical `jobUrl`；
-- extension 不读取/持有 API key、model、完整 JD；
-- popup 初始化只根据 active-tab URL 分类，不发网络请求、不执行 DOM injection；
-- 点击时重新读取并验证当前 active tab；
-- 同一 popup in-flight 时禁止重复 click；
-- finally 再读取当前 tab，避免 stale URL fail-open；
-- UI 必须明确披露：点击后会把已保存岗位的完整 JD + 批准最小上下文发送到用户配置的 OpenAI 模型，可能产生 API 费用；
-- success 仅提示结果已保存，本批不显示完整 LLM output、不新增 Dashboard。
+`9959cbf9a372509207ce3c78e29a800be6d39f03`
 
-Batch 4 仍不使用真实 key，不执行真实 OpenAI 请求。Batch 4 PASS 后 Capability 12 仍保持 `IN_PROGRESS`；之后需要用户明确同意后的代表性真实模型评测，才能考虑整体验收。
+产品 diff 只涉及：
+
+- `src/bridge/local-service-client.ts`
+- `entrypoints/popup/structured-llm-analysis-controller.ts`
+- `entrypoints/popup/index.html`
+- `entrypoints/popup/main.ts`
+- `entrypoints/popup/style.css`
+
+外部代码审阅没有发现需要 Codex repair 的产品缺陷。
+
+Batch 4 新增并验证：
+
+- 独立 structured LLM browser localhost client；
+- network 前 exact canonical request validation；
+- 每次独立分析动作 fresh protocol-2 bridge session；
+- 固定 `/structured-llm-analyses` endpoint；
+- browser POST body 只有 `jobUrl`；
+- browser 不读取/持有 API key、model、完整 JD；
+- analysis POST 独立 50 秒 bounded timeout，覆盖 response body consumption；
+- analysis POST **0 automatic retries**；
+- strict HTTP 200 exact positive safe-integer `{id}`；
+- 400/403/404/413/422/502/503 固定本地 failure mapping；
+- non-200 body 不反射到 UI；
+- popup `AI 岗位分析` 显式用户动作；
+- 完整 JD + 最小化上下文远程发送与 OpenAI API 费用透明披露；
+- popup initialization 0 analysis calls；
+- canonical detail URL visibility；
+- click-time active-tab revalidation；
+- in-flight duplicate click guard；
+- finally fresh-tab restore / lookup failure fail closed；
+- success 只显示结果已保存，不显示 analysis JSON/id；
+- 没有新增 browser permission、API key UI、model selector、Dashboard 或 Capability 13。
+
+Codex 产品 commit 自己的原始 CI run `34183316291` 已经 `success`。
+
+外部网页版 ChatGPT 随后新增：
+
+- `tests/structured-llm-browser-client.test.ts` — 29 tests
+- `tests/structured-llm-analysis-controller.test.ts` — 19 tests
+
+Batch 4 专项：**48 / 48 passed**。
+
+最终外部测试 head：
+
+`e276ed7c1265719117210482106ea24dd45352d4`
+
+最终 CI run：
+
+`34185674592`
+
+最终工程验证：
+
+- `npm ci`：PASS
+- `npm run typecheck`：PASS
+- `npm run lint`：PASS
+- `npm test`：PASS — **52 test files / 762 tests passed**
+- `npm run build`：PASS
+- `npm run build:edge`：PASS
+- `npm run build:local`：PASS
+- `npm run verify:manifests`：PASS
+
+Batch 4 没有读取用户真实 API key、没有访问 OpenAI、没有产生真实 API 费用。真实浏览器中的实际 provider 点击路径与代表性真实模型评测合并到 Batch 5 一次完成，避免重复要求用户做本机人工操作。
+
+正式记录：`docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
+
+## Phase 6 / Batch 5 验证门槛
+
+批准计划：
+
+`docs/decisions/ADR-0019-representative-real-openai-evaluation-v1.md`
+
+Batch 5 是**验证批，不是预设 Codex 产品编码批**。
+
+进入前必须由用户明确同意：
+
+- 将选定岗位完整 JD + 已批准最小上下文通过本地服务发送给 OpenAI；
+- 可能产生 OpenAI API 费用；
+- API key 只配置在用户本机 local-service process，不粘贴给 ChatGPT/Codex/GitHub；
+- 每次 provider request 仍由用户主动点击，zero automatic retry。
+
+代表性评测至少覆盖真实 end-to-end 成功路径，并逐步覆盖适合转行、经验硬门槛、职责模糊/疑似伪运营等自然样本。外部 ChatGPT负责把实际问题区分为产品缺陷、模型能力限制、样本信息不足或可接受表现。
+
+如果真实评测发现产品缺陷，再生成一个窄 repair Prompt 给 Codex；如果没有产品缺陷且评测通过，才考虑 `Capability 12 → VERIFIED`、`Phase 6 → PASS`，然后进入 Phase 7 / Capability 13。
 
 ## 协作与测试规则
 
