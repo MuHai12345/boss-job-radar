@@ -36,26 +36,65 @@
 ## 当前验收快照
 
 - Phase 0–4：`PASS`
-- Phase 5 / Batch 1：`PASS`（岗位真实性质 + 经验门槛确定性分析）
-- Phase 5 / Batch 2：`PASS`（SearchRun 薪资 PUA 可信解码与产品链路）
-- Phase 5 / Batch 3：`PASS`（招聘者活跃、平台新鲜度、local observation recency、岗位 link 状态）
-- Phase 5 / Batch 4：`PASS`（成长性、转行价值、风险、当前机会优先级、面试追问）
+- Phase 5 / Batch 1：`PASS`
+- Phase 5 / Batch 2：`PASS`
+- Phase 5 / Batch 3：`PASS`
+- Phase 5 / Batch 4：`PASS`
 - Phase 5：`PASS`
-- Phase 6 / Batch 1：`PASS`（provider-neutral structured LLM analysis foundation）
-- Phase 6 / Batch 2：`PASS`（OpenAI Responses provider transport v1）
-- Phase 6 / Batch 3：`PASS`（product-specific local OpenAI config + protected explicit localhost analysis trigger）
-- Phase 6 / Batch 4：`PASS`（popup explicit user trigger + browser cost/privacy boundary）
+- Phase 6 / Batch 1：`PASS` — provider-neutral structured LLM foundation
+- Phase 6 / Batch 2：`PASS` — OpenAI Responses transport v1
+- Phase 6 / Batch 3：`PASS` — local provider config + protected explicit localhost trigger
+- Phase 6 / Batch 4：`PASS` — popup explicit user trigger + browser privacy/cost boundary
+- Phase 6 / Batch 5A：`PASS` — Lave8 relay adapter v1 + OpenAI backward-compatibility repair
+- Phase 6 / Batch 5B：`PENDING` — representative real Lave8 evaluation
 - Phase 6：`IN_PROGRESS`
 
-Phase 6 / Batch 1 已验证：最小输入快照、prompt-injection boundary、strict structured output validation、evidence grounding、schema v8、provider/model/source-state persistence、provider-call idempotency、source-change race、transaction boundary 和失败语义。
+## Capability 12 当前覆盖
 
-Phase 6 / Batch 2 已验证：OpenAI provider/model allowlist、API key constructor secret boundary、固定 Responses endpoint、system/user prompt 分离、Structured Outputs `json_schema` + strict、`store:false`、no tools/conversation、completed-only response parsing、refusal/incomplete/malformed fail-closed、45 秒 timeout、AbortController、zero retry 和完整回归。
+已外部验证：
 
-Phase 6 / Batch 3 已验证：产品专用 key/model env、disabled-by-default、partial/invalid config fail closed、startup secret sanitization、runtime optional provider、protected `POST /structured-llm-analyses`、exact canonical jobUrl-only request、Host/Origin/token/content-type/encoding/body-limit security、id-only success response、generic failure hygiene、startup/import/link/status/opportunity 0 provider calls、same-state explicit-trigger idempotency。最终 **50 test files / 714 tests passed**。
+- minimized structured LLM snapshot；
+- prompt-injection boundary；
+- strict structured output validation；
+- full-JD evidence / upstream-code grounding；
+- schema v8 persistence；
+- provider/model/source-state identity；
+- same-state idempotency；
+- source-change race rejection；
+- provider call outside SQLite transaction；
+- official OpenAI Responses transport；
+- local opt-in config 与 secret sanitization；
+- protected localhost explicit analysis trigger；
+- popup explicit user click；
+- browser 0 secret / 0 model / 0 full-JD payload；
+- 50 秒 browser deadline / zero automatic retry；
+- Lave8 独立 provider identity；
+- fixed `https://lave8.com/v1/responses`；
+- `gpt-6-astra` explicit allowlist；
+- Lave8 Bearer secret boundary；
+- strict Responses request/schema/parser；
+- 45 秒 provider timeout；
+- zero retry / zero fallback；
+- OpenAI existing runtime-config observable contract 保持兼容；
+- provider-neutral popup remote-data / API-cost disclosure。
 
-Phase 6 / Batch 4 已验证：browser 侧网络前 exact canonical request validation、fresh session per action、jobUrl-only localhost payload、浏览器不接触 API key/model/full JD、50 秒 analysis deadline、zero retry、严格 200 `{id}`、固定 HTTP failure mapping、non-200 body hygiene、popup 初始化 0 analysis calls、click-time active-tab revalidation、in-flight duplicate guard、fresh-final-tab fail-closed restore，以及远程数据/API 费用透明披露。最终 **52 test files / 762 tests passed**；Batch 4 专项 **48 / 48 passed**。
+Batch 5A 最终：**54 test files / 781 tests passed**；typecheck、lint、Chrome build、Edge build、local build、manifest verification 全部 PASS。
 
-Capability 12 仍不提前标记 `VERIFIED`。产品实现链路已经到达真实 provider 验证门槛；下一步不需要为了“继续编码”而扩张产品范围，而是先完成用户明确同意后的代表性真实 OpenAI end-to-end 评测与人工抽查。
+## Capability 12 剩余门槛
+
+Capability 12 仍不提前标记 `VERIFIED`。
+
+下一步必须完成 `Phase 6 / Batch 5B — representative real Lave8 evaluation v1`：
+
+- 至少 1 个真实已保存 BOSS 岗位；
+- 用户主动点击；
+- browser → localhost → `https://lave8.com/v1/responses` → strict validator → SQLite；
+- persisted identity 为 `lave8` / `gpt-6-astra`；
+- 无 automatic paid retry；
+- 无 secret/error leakage；
+- 外部 ChatGPT 对真实 structured result 完成 grounding 与业务可用性人工验收。
+
+如果真实 relay 暴露具体兼容问题，按 `CHANGES_REQUIRED` 生成窄 repair；如果真实评测通过，才考虑 Capability 12 → `VERIFIED` 与 Phase 6 → `PASS`。
 
 正式记录：
 
@@ -63,3 +102,8 @@ Capability 12 仍不提前标记 `VERIFIED`。产品实现链路已经到达真�
 - `docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
 - `docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
 - `docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
+- `docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
+
+下一批设计：
+
+- `docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
