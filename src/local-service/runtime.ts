@@ -12,6 +12,7 @@ import {
   type LocalService,
   type LocalServiceAddress,
   type StructuredLlmAnalysisWriter,
+  type AnalysisHttpDiagnosticEvent,
 } from './server.js';
 
 export interface LocalRuntime {
@@ -48,6 +49,7 @@ export async function startLocalRuntime(options: {
   readonly port: number;
   readonly structuredLlmProvider?: StructuredLlmProvider;
   readonly onStructuredLlmDiagnostic?: (event: StructuredLlmAnalysisDiagnosticEvent) => void;
+  readonly onAnalysisHttpDiagnostic?: (event: AnalysisHttpDiagnosticEvent) => void;
 }): Promise<LocalRuntime> {
   const database = openLocalDatabase({ path: options.databasePath });
 
@@ -78,6 +80,7 @@ export async function startLocalRuntime(options: {
       imports: database.imports,
       linkChecks: database.linkChecks,
       port: options.port,
+      ...(options.onAnalysisHttpDiagnostic === undefined ? {} : { onAnalysisHttpDiagnostic: options.onAnalysisHttpDiagnostic }),
       ...(structuredLlmAnalyses === undefined ? {} : { structuredLlmAnalyses }),
     });
   } catch (error) {

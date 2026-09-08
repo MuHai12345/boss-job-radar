@@ -1,7 +1,7 @@
 import { OPENAI_STRUCTURED_LLM_OUTPUT_SCHEMA } from './openai-structured-llm-output-schema.js';
 import type { StructuredLlmProvider, StructuredLlmProviderRequest } from './structured-llm-provider.js';
 import {
-  emitDiagnosticSafely, safeLave8RequestParameter, summarizeLave8Response,
+  emitDiagnosticSafely, safeLave8RequestParameter, summarizeLave8Error, summarizeLave8Response,
   type Lave8RequestParameter, type Lave8StructuredLlmDiagnosticEvent,
 } from './lave8-structured-llm-diagnostics.js';
 
@@ -128,13 +128,16 @@ export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProv
             emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'http_response', status });
             if (status < 200 || status >= 300) {
               let requestParameter: Lave8RequestParameter = 'unknown';
+              let summary = summarizeLave8Error(undefined);
               try {
-                requestParameter = safeLave8RequestParameter(await response.json());
+                const errorBody: unknown = await response.json();
+                requestParameter = safeLave8RequestParameter(errorBody);
+                summary = summarizeLave8Error(errorBody);
               } catch {
                 // A non-JSON error body provides no approved parameter metadata.
               }
               if (controller.signal.aborted) failed();
-              emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'http_non_2xx', status, requestParameter });
+              emitDiagnosticSafely(onDiagnostic, { scope: 'lave8', event: 'http_non_2xx', status, requestParameter, summary });
               return failed();
             }
             let body: unknown;

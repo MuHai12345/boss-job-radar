@@ -11,7 +11,7 @@ export const messages = {
   empty: '没有读取到可展示的岗位，请等待页面加载完成后重试。',
   service: '本地服务未启动或无法连接。',
   save: '本次未能确认保存成功，请稍后重新保存。',
-  analysis: '本次未能确认 AI 分析成功，请稍后查看本地记录；不会自动重试。',
+  analysis: '本次未能确认 AI 分析成功，请稍后查看本地记录；不会自动重试。手动再次点击 AI 分析会开始一次新的分析尝试，可能再次发起远程请求并产生 API 费用。',
   job_not_found: '请先把当前岗位保存到本地，再进行 AI 分析。',
   analysis_unavailable: '当前岗位缺少完整职位描述，请重新保存岗位详情。',
   analysis_not_configured: '本地 AI 分析尚未配置。',

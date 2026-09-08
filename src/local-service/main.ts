@@ -18,10 +18,10 @@ import {
   resolveProductionDataPaths,
 } from './production-data-path.js';
 import { startLocalRuntime, type StructuredLlmAnalysisDiagnosticEvent } from './runtime.js';
-import { LOCAL_SERVICE_HOST } from './server.js';
+import { LOCAL_SERVICE_HOST, type AnalysisHttpDiagnosticEvent } from './server.js';
 import { formatStartupError } from './startup-error.js';
 
-function logStructuredLlmDiagnostic(event: Lave8StructuredLlmDiagnosticEvent | StructuredLlmAnalysisDiagnosticEvent): void {
+function logStructuredLlmDiagnostic(event: Lave8StructuredLlmDiagnosticEvent | StructuredLlmAnalysisDiagnosticEvent | AnalysisHttpDiagnosticEvent): void {
   console.log(`BJR_LLM_DIAGNOSTIC ${JSON.stringify(event)}`);
 }
 
@@ -67,6 +67,7 @@ try {
     databasePath: productionDataPaths.databasePath,
     port,
     onStructuredLlmDiagnostic: logStructuredLlmDiagnostic,
+    onAnalysisHttpDiagnostic: logStructuredLlmDiagnostic,
     ...(structuredLlmProvider === undefined ? {} : { structuredLlmProvider }),
   });
 

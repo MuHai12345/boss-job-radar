@@ -1,9 +1,20 @@
 const RESPONSE_STATUSES = ['completed', 'failed', 'incomplete', 'queued', 'in_progress', 'cancelled', 'other'] as const;
 const OUTPUT_ITEM_KINDS = ['reasoning', 'message', 'function_call', 'web_search_call', 'file_search_call', 'computer_call', 'other'] as const;
 const CONTENT_KINDS = ['output_text', 'refusal', 'other'] as const;
-const REQUEST_PARAMETERS = ['background', 'store', 'stream', 'reasoning', 'max_output_tokens', 'input', 'text', 'text.format', 'unknown'] as const;
+const REQUEST_PARAMETERS = [
+  'model', 'background', 'store', 'stream', 'reasoning', 'reasoning.effort',
+  'max_output_tokens', 'input', 'text', 'text.format', 'text.format.type',
+  'text.format.name', 'text.format.strict', 'text.format.schema', 'unknown',
+] as const;
 
 export type Lave8RequestParameter = typeof REQUEST_PARAMETERS[number];
+
+export interface Lave8ErrorSummary {
+  readonly bodyStructure: 'json_object_absent' | 'error_object_absent' | 'error_object_present';
+  readonly errorType: 'invalid_request' | 'authentication' | 'rate_limit' | 'server' | 'other' | 'absent';
+  readonly errorCode: 'invalid_api_key' | 'model_not_found' | 'unsupported_parameter'
+    | 'rate_limit' | 'insufficient_quota' | 'context_length' | 'other' | 'absent';
+}
 
 export interface Lave8ResponseStructuralSummary {
   readonly responseStatus: typeof RESPONSE_STATUSES[number];
@@ -16,7 +27,7 @@ export interface Lave8ResponseStructuralSummary {
 export type Lave8StructuredLlmDiagnosticEvent = { readonly scope: 'lave8' } & (
   | { readonly event: 'request_started' | 'timeout' | 'network_failure' | 'response_json_invalid' | 'response_accepted' }
   | { readonly event: 'http_response'; readonly status: number }
-  | { readonly event: 'http_non_2xx'; readonly status: number; readonly requestParameter: Lave8RequestParameter }
+  | { readonly event: 'http_non_2xx'; readonly status: number; readonly requestParameter: Lave8RequestParameter; readonly summary: Lave8ErrorSummary }
   | { readonly event: 'response_contract_invalid'; readonly summary: Lave8ResponseStructuralSummary }
 );
 
@@ -47,6 +58,53 @@ function member<const T extends readonly string[]>(value: unknown, choices: T, f
 
 export function safeLave8RequestParameter(body: unknown): Lave8RequestParameter {
   return member(field(field(body, 'error'), 'param'), REQUEST_PARAMETERS, 'unknown');
+}
+
+function isPlainObject(value: unknown): boolean {
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+    const prototype: unknown = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function errorType(value: unknown): Lave8ErrorSummary['errorType'] {
+  switch (value) {
+    case undefined: case null: return 'absent';
+    case 'invalid_request_error': case 'invalid_request': return 'invalid_request';
+    case 'authentication_error': case 'authentication': return 'authentication';
+    case 'rate_limit_error': case 'rate_limit': return 'rate_limit';
+    case 'server_error': case 'server': return 'server';
+    default: return 'other';
+  }
+}
+
+function errorCode(value: unknown): Lave8ErrorSummary['errorCode'] {
+  switch (value) {
+    case undefined: case null: return 'absent';
+    case 'invalid_api_key': return 'invalid_api_key';
+    case 'model_not_found': return 'model_not_found';
+    case 'unsupported_parameter': return 'unsupported_parameter';
+    case 'rate_limit_exceeded': case 'rate_limit': return 'rate_limit';
+    case 'insufficient_quota': return 'insufficient_quota';
+    case 'context_length_exceeded': case 'context_length': return 'context_length';
+    default: return 'other';
+  }
+}
+
+/** Fixed local categories only; never read error.message or serialize external data. */
+export function summarizeLave8Error(body: unknown): Lave8ErrorSummary {
+  const bodyPresent = isPlainObject(body);
+  const error = bodyPresent ? field(body, 'error') : undefined;
+  const errorPresent = isPlainObject(error);
+  return {
+    bodyStructure: !bodyPresent ? 'json_object_absent'
+      : errorPresent ? 'error_object_present' : 'error_object_absent',
+    errorType: errorType(errorPresent ? field(error, 'type') : undefined),
+    errorCode: errorCode(errorPresent ? field(error, 'code') : undefined),
+  };
 }
 
 // Cap traversal and all counts at 100. Kind arrays contain unique local enums.
