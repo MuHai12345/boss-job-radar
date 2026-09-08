@@ -8,7 +8,7 @@ export const BOSS_JOB_RADAR_LAVE8_MODEL_ENV = 'BOSS_JOB_RADAR_LAVE8_MODEL';
 
 export type StructuredLlmRuntimeConfig =
   | { readonly enabled: false }
-  | { readonly enabled: true; readonly provider: 'openai'; readonly apiKey: string; readonly modelId: string }
+  | { readonly enabled: true; readonly apiKey: string; readonly modelId: string }
   | { readonly enabled: true; readonly provider: 'lave8'; readonly apiKey: string; readonly modelId: string };
 
 /** Parse explicit values only; never discover credentials or choose a model. */
@@ -31,5 +31,6 @@ export function parseStructuredLlmRuntimeConfig(
     || typeof model !== 'string' || !allowedModels.some((allowed) => allowed === model)) {
     throw new Error('Invalid structured LLM runtime configuration');
   }
-  return { enabled: true, provider: hasLave8 ? 'lave8' : 'openai', apiKey, modelId: model };
+  if (hasLave8) return { enabled: true, provider: 'lave8', apiKey, modelId: model };
+  return { enabled: true, apiKey, modelId: model };
 }

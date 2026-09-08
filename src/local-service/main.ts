@@ -40,7 +40,7 @@ try {
     process.env[BOSS_JOB_RADAR_LAVE8_MODEL_ENV],
   );
   const structuredLlmProvider = llmConfig.enabled
-    ? llmConfig.provider === 'lave8'
+    ? 'provider' in llmConfig && llmConfig.provider === 'lave8'
       ? createLave8StructuredLlmProvider(llmConfig)
       : createOpenAiStructuredLlmProvider(llmConfig)
     : undefined;
