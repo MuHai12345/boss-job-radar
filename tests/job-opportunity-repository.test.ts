@@ -1,5 +1,5 @@
 import SqliteDatabase from 'better-sqlite3';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createImportRepository } from '../src/local-service/database/import-repository';
 import { createJobLinkCheckRepository } from '../src/local-service/database/job-link-check-repository';
@@ -10,6 +10,16 @@ import type { ImportRequest } from '../src/shared/import-request-types';
 import type { JobObservationInput } from '../src/shared/job-observation-types';
 
 const JOB_URL = 'https://www.zhipin.com/job_detail/opportunity-example.html';
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-07T10:00:00.000Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 function detailObservation(overrides: Partial<JobObservationInput> = {}): JobObservationInput {
   return {
