@@ -5,6 +5,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   LOCAL_SERVICE_HOST,
   startLocalService,
+  type AnalysisHttpDiagnosticEvent,
   type ImportBatchWriter,
   type JobLinkCheckWriter,
   type StructuredLlmAnalysisWriter,
@@ -64,6 +65,7 @@ describe('loopback-only local service', () => {
           readonly imports: ImportBatchWriter;
           readonly linkChecks?: JobLinkCheckWriter;
           readonly structuredLlmAnalyses?: StructuredLlmAnalysisWriter;
+          readonly onAnalysisHttpDiagnostic?: (event: AnalysisHttpDiagnosticEvent) => void;
           readonly port: number;
         },
       ]
