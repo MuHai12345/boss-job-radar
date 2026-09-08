@@ -3,6 +3,7 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import SqliteDatabase from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -33,6 +34,7 @@ const JD = [
 
 const temporaryDirectories: string[] = [];
 const runtimes: LocalRuntime[] = [];
+const runtimePaths = new WeakMap<LocalRuntime, string>();
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -155,14 +157,24 @@ async function start(
   events: StructuredLlmAnalysisDiagnosticEvent[],
   onDiagnostic?: (event: StructuredLlmAnalysisDiagnosticEvent) => void,
 ): Promise<LocalRuntime> {
+  const path = await databasePath();
   const runtime = await startLocalRuntime({
-    databasePath: await databasePath(),
+    databasePath: path,
     port: 0,
     structuredLlmProvider: provider,
     onStructuredLlmDiagnostic: onDiagnostic ?? ((event) => events.push(event)),
   });
+  runtimePaths.set(runtime, path);
   runtimes.push(runtime);
   return runtime;
+}
+
+function inspect<T>(runtime: LocalRuntime, operation: (database: SqliteDatabase.Database) => T): T {
+  const path = runtimePaths.get(runtime);
+  if (!path) throw new Error('Runtime database path is unavailable.');
+  const database = new SqliteDatabase(path);
+  try { return operation(database); }
+  finally { database.close(); }
 }
 
 function seed(runtime: LocalRuntime, input = observation()): number {
@@ -207,7 +219,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     const runtime = await start(provider, events);
     const jobId = seed(runtime);
     expect(runtime.database.analyses.analyzeJob(jobId)).not.toBeNull();
-    runtime.database.raw.prepare("UPDATE deterministic_job_analyses SET analysis_json = '{}'").run();
+    inspect(runtime, (database) => database.prepare("UPDATE deterministic_job_analyses SET analysis_json = '{}'").run());
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(0);
@@ -233,7 +245,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
     expect(events).toEqual([{ scope: 'analysis', stage: 'source_changed' }]);
-    expect(runtime.database.raw.prepare('SELECT COUNT(*) AS count FROM structured_llm_analyses').get()).toEqual({ count: 0 });
+    expect(inspect(runtime, (database) => database.prepare('SELECT COUNT(*) AS count FROM structured_llm_analyses').get())).toEqual({ count: 0 });
   });
 
   it('maps a corrupted cached analysis to stored_analysis_invalid without a second provider call', async () => {
@@ -245,7 +257,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     const first = await analyze(runtime);
     expect(first.statusCode).toBe(200);
     expect(provider.calls).toBe(1);
-    runtime.database.raw.prepare("UPDATE structured_llm_analyses SET analysis_json = '{}'").run();
+    inspect(runtime, (database) => database.prepare("UPDATE structured_llm_analyses SET analysis_json = '{}'").run());
     events.length = 0;
 
     expectGeneric502(await analyze(runtime));
@@ -258,13 +270,13 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     const provider = fakeProvider();
     const runtime = await start(provider, events);
     seed(runtime);
-    runtime.database.raw.exec(`
+    inspect(runtime, (database) => database.exec(`
       CREATE TRIGGER fail_structured_llm_insert
       BEFORE INSERT ON structured_llm_analyses
       BEGIN
         SELECT RAISE(ABORT, 'PRIVATE_SQLITE_DIAGNOSTIC_SENTINEL');
       END;
-    `);
+    `));
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
