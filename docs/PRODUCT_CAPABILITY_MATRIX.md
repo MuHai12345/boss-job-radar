@@ -135,4 +135,4 @@ Capability 12 仍不提前标记 `VERIFIED`。
 
 当前真实评测设计：
 
-- `docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`（后续执行时以当前 `gpt-5.6-sol` 产品模型与最新状态记录为准）
+- `docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`
