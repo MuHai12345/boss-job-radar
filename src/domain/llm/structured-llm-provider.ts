@@ -8,6 +8,7 @@ export interface StructuredLlmProviderRequest {
 }
 
 export interface StructuredLlmProvider {
+  readonly timeoutMs?: number;
   readonly providerId: string;
   readonly modelId: string;
   generate(request: StructuredLlmProviderRequest): Promise<unknown>;

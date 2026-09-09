@@ -58,7 +58,10 @@ function create(options: {
     apiKey: SECRET,
     modelId: 'gpt-5.6-sol',
     fetchImpl: options.fetchImpl,
-    onDiagnostic: options.onDiagnostic ?? ((event) => options.events?.push(event)),
+    onDiagnostic: options.onDiagnostic ?? ((event) => {
+      expect(event.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      options.events?.push(event);
+    }),
   });
 }
 
@@ -135,7 +138,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     });
 
     await expect(provider.generate(REQUEST)).resolves.toEqual({ transported: true });
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
       { scope: 'lave8', event: 'response_accepted' },
@@ -161,7 +164,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 400 },
       {
@@ -191,7 +194,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(events.at(-1)).toEqual({
+    expect(events.at(-1)).toMatchObject({
       scope: 'lave8', event: 'http_non_2xx', status: 422, requestParameter: 'unknown',
       summary: {
         bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other', messageHints: ['other'],
@@ -208,7 +211,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(events.at(-1)).toEqual({
+    expect(events.at(-1)).toMatchObject({
       scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'unknown',
       summary: {
         bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent', messageHints: [],
@@ -225,7 +228,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
       { scope: 'lave8', event: 'response_json_invalid' },
@@ -249,7 +252,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     const provider = create({ events, fetchImpl: async () => responseJson(body) });
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
       {
@@ -282,7 +285,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
 
     await expect(provider.generate(REQUEST)).rejects.toThrow('Structured LLM provider failed');
     expect(calls).toBe(1);
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'network_failure' },
     ]);
@@ -313,7 +316,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
 
     expect(calls).toBe(1);
     expect(signal?.aborted).toBe(true);
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'timeout' },
     ]);

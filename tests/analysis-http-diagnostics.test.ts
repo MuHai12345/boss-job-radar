@@ -1,4 +1,9 @@
 import { request } from 'node:http';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createAttemptEvidenceStore } from '../src/local-service/attempt-evidence';
+import { createRuntimeIdentity } from '../src/local-service/runtime-identity';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -88,6 +93,36 @@ async function postAnalysis(port: number, token: string, jobUrl: string): Promis
 }
 
 describe('analysis HTTP safe request diagnostics', () => {
+  it('keeps writing the same attempt after the client disconnects at its deadline', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'bjr-client-deadline-'));
+    let release!: () => void;
+    const providerWait = new Promise<void>(resolve => { release = resolve; });
+    let accepted!: () => void;
+    const started = new Promise<void>(resolve => { accepted = resolve; });
+    let finished!: () => void;
+    const ended = new Promise<void>(resolve => { finished = resolve; });
+    const analyzeJobUrl = vi.fn(async () => { accepted(); await providerWait; return { status: 'ok' as const, id: 42 }; });
+    const service = await startLocalService({ imports: IMPORTS, port: 0, structuredLlmAnalyses: { analyzeJobUrl },
+      attemptEvidence: createAttemptEvidenceStore(directory, createRuntimeIdentity()),
+      onAnalysisHttpDiagnostic(event) { if (event.event === 'result') finished(); },
+    });
+    try {
+      const token = await sessionToken(service.address.port);
+      const client = request({ host: LOCAL_SERVICE_HOST, port: service.address.port, method: 'POST', path: '/structured-llm-analyses', headers: protectedHeaders(token) });
+      client.on('error', () => undefined);
+      client.end(JSON.stringify({ jobUrl: URLS.ok }));
+      await started;
+      const log = readdirSync(directory).find(name => name.endsWith('.log'))!;
+      expect(readFileSync(join(directory, log), 'utf8')).toContain('request_accepted');
+      client.destroy();
+      release();
+      await ended;
+      expect(analyzeJobUrl).toHaveBeenCalledOnce();
+      const records = readFileSync(join(directory, log), 'utf8').trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+      expect(new Set(records.map(event => event.attemptId)).size).toBe(1);
+      expect(records.at(-1)).toMatchObject({ event: 'result', outcome: 'ok', analysisId: 42 });
+    } finally { release(); await service.close(); rmSync(directory, { recursive: true, force: true }); }
+  });
   it('emits one accepted/result pair per valid writer invocation with a matching process-local ordinal', async () => {
     const events: AnalysisHttpDiagnosticEvent[] = [];
     const service = await startLocalService({
@@ -115,6 +150,7 @@ describe('analysis HTTP safe request diagnostics', () => {
 
       expect(events).toHaveLength(cases.length * 2);
       const acceptedOrdinals: number[] = [];
+      const attemptIds = new Set<string>();
       for (let index = 0; index < cases.length; index += 1) {
         const accepted = events[index * 2];
         const result = events[index * 2 + 1];
@@ -123,8 +159,14 @@ describe('analysis HTTP safe request diagnostics', () => {
         expect(result).toMatchObject({ scope: 'analysis_http', event: 'result', outcome: expectedOutcome });
         expect(accepted!.ordinal).toBeGreaterThan(0);
         expect(result!.ordinal).toBe(accepted!.ordinal);
+        expect(accepted!.attemptId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(result!.attemptId).toBe(accepted!.attemptId);
+        expect(accepted!.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+        expect(result!.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+        attemptIds.add(accepted!.attemptId!);
         acceptedOrdinals.push(accepted!.ordinal);
       }
+      expect(attemptIds.size).toBe(cases.length);
       for (let index = 1; index < acceptedOrdinals.length; index += 1) {
         expect(acceptedOrdinals[index]!).toBeGreaterThan(acceptedOrdinals[index - 1]!);
       }

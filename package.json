@@ -13,7 +13,7 @@
     "test": "vitest run",
     "build": "wxt build",
     "build:edge": "wxt build -b edge",
-    "build:local": "tsc -p tsconfig.local-service.json",
+    "build:local": "tsc -p tsconfig.local-service.json && node scripts/stamp-local-build.mjs",
     "start:local": "node .output/local-service/main.js",
     "verify:manifests": "node scripts/verify-manifests.mjs"
   },

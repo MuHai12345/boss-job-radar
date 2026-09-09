@@ -2,6 +2,8 @@
 
 ## 当前状态快照
 
+> 2026-09-09 最新外部 Prompt：暂停所有新的真实 Lave8/OpenAI 请求。本轮仅实现 Structured LLM real-evaluation observability / evidence reliability infrastructure，等待外部独立审阅。本文后续历史真实调用计划不构成当前授权。Capability 12 仍为 IN_PROGRESS，未产生 representative real sample。
+
 - 仓库：`MuHai12345/boss-job-radar`
 - 分支：`master`
 - Phase 0–5：`PASS`
@@ -24,7 +26,7 @@
 - 最新工程 CI：`34327704721` — **58 test files / 783 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
 - 当前产品实现阻塞：无
 - 当前验证阻塞：尚无真实 `gpt-5.6-sol` strict validator → SQLite representative sample
-- 下一步：使用已验证的 90s provider / 100s browser deadline，只做一次新的用户显式 Sol 真实分析；若 validator 失败，读取 fixed `validationReason`，若通过则验证 SQLite sample 与业务质量
+- 下一步：外部 ChatGPT 独立审阅本轮证据基础设施及工程回归；审阅前禁止新的真实调用。本轮完成后停止，不自行批准用户点击 AI 分析。
 
 ## 已验证核心能力
 
@@ -212,7 +214,7 @@ Background repair 后的一次受控真实 Sol 调用首次达到 HTTP 200 + `la
 
 ## 当前真实验证门槛
 
-当前批准计划：`docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`
+历史计划（当前暂停）：`docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`。新的前置条件见 `docs/decisions/ADR-0023-real-evaluation-evidence-infrastructure.md`；以下为历史门槛记录，不是当前调用授权。
 
 下一次只允许一次新的用户显式真实调用，并且本地源码/编译产物必须包含：
 

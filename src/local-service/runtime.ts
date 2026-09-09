@@ -1,4 +1,8 @@
 import type { StructuredLlmProvider } from '../domain/llm/structured-llm-provider.js';
+import { dirname, join } from 'node:path';
+import { createRuntimeIdentity, type RuntimeIdentity } from './runtime-identity.js';
+import { createAttemptEvidenceStore } from './attempt-evidence.js';
+import { emitAttemptDiagnostic, type DiagnosticMetadata } from './analysis-attempt-context.js';
 import {
   getStructuredLlmOutputValidationReason,
   type StructuredLlmOutputValidationReason,
@@ -20,12 +24,13 @@ import {
 } from './server.js';
 
 export interface LocalRuntime {
+  readonly identity: RuntimeIdentity;
   readonly address: LocalServiceAddress;
   readonly database: LocalDatabase;
   close(): Promise<void>;
 }
 
-export type StructuredLlmAnalysisDiagnosticEvent = {
+export type StructuredLlmAnalysisDiagnosticEvent = DiagnosticMetadata & ({
   readonly scope: 'analysis';
   readonly stage: 'invalid_source' | 'provider_failed'
     | 'source_changed' | 'stored_analysis_invalid' | 'internal_or_persistence';
@@ -33,7 +38,7 @@ export type StructuredLlmAnalysisDiagnosticEvent = {
   readonly scope: 'analysis';
   readonly stage: 'output_validation_failed';
   readonly validationReason: StructuredLlmOutputValidationReason;
-};
+});
 
 function analysisFailureStage(error: unknown): StructuredLlmAnalysisDiagnosticEvent['stage'] {
   if (getStructuredLlmOutputValidationReason(error) !== undefined) return 'output_validation_failed';
@@ -61,6 +66,8 @@ export async function startLocalRuntime(options: {
   readonly onStructuredLlmDiagnostic?: (event: StructuredLlmAnalysisDiagnosticEvent) => void;
   readonly onAnalysisHttpDiagnostic?: (event: AnalysisHttpDiagnosticEvent) => void;
 }): Promise<LocalRuntime> {
+  const identity = createRuntimeIdentity(options.structuredLlmProvider);
+  const attemptEvidence = createAttemptEvidenceStore(join(dirname(options.databasePath), 'safe-diagnostics'), identity);
   const database = openLocalDatabase({ path: options.databasePath });
 
   let service: LocalService;
@@ -79,12 +86,12 @@ export async function startLocalRuntime(options: {
             } catch (error) {
               try {
                 const stage = analysisFailureStage(error);
-                options.onStructuredLlmDiagnostic?.(stage === 'output_validation_failed'
+                emitAttemptDiagnostic(stage === 'output_validation_failed'
                   ? {
                       scope: 'analysis', stage,
                       validationReason: getStructuredLlmOutputValidationReason(error) ?? 'other_validation_failure',
                     }
-                  : { scope: 'analysis', stage });
+                  : { scope: 'analysis', stage }, options.onStructuredLlmDiagnostic);
               } catch {
                 // Preserve the original exception even if the observer fails.
               }
@@ -93,6 +100,7 @@ export async function startLocalRuntime(options: {
           },
         };
     service = await startLocalService({
+      attemptEvidence,
       imports: database.imports,
       linkChecks: database.linkChecks,
       port: options.port,
@@ -111,6 +119,7 @@ export async function startLocalRuntime(options: {
 
   let closePromise: Promise<void> | undefined;
   return {
+    identity,
     address: service.address,
     database,
     close(): Promise<void> {

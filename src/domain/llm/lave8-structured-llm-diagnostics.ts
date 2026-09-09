@@ -1,3 +1,5 @@
+import { emitAttemptDiagnostic, type DiagnosticMetadata } from '../../local-service/analysis-attempt-context.js';
+
 const RESPONSE_STATUSES = ['completed', 'failed', 'incomplete', 'queued', 'in_progress', 'cancelled', 'other'] as const;
 const OUTPUT_ITEM_KINDS = ['reasoning', 'message', 'function_call', 'web_search_call', 'file_search_call', 'computer_call', 'other'] as const;
 const CONTENT_KINDS = ['output_text', 'refusal', 'other'] as const;
@@ -62,7 +64,7 @@ export interface Lave8ResponseStructuralSummary {
   readonly outputTextCount: number;
 }
 
-export type Lave8StructuredLlmDiagnosticEvent = { readonly scope: 'lave8' } & (
+export type Lave8StructuredLlmDiagnosticEvent = DiagnosticMetadata & { readonly scope: 'lave8' } & (
   | { readonly event: 'request_started' | 'timeout' | 'network_failure' | 'response_json_invalid' | 'response_accepted' }
   | { readonly event: 'http_response'; readonly status: number }
   | { readonly event: 'http_non_2xx'; readonly status: number; readonly requestParameter: Lave8RequestParameter; readonly summary: Lave8ErrorSummary }
@@ -73,9 +75,7 @@ export function emitDiagnosticSafely(
   callback: ((event: Lave8StructuredLlmDiagnosticEvent) => void) | undefined,
   event: Lave8StructuredLlmDiagnosticEvent,
 ): void {
-  try { callback?.(event); } catch {
-    // Diagnostics must never change the provider result or trigger another call.
-  }
+  emitAttemptDiagnostic(event, callback);
 }
 
 /** Inspect only named own data properties, never external accessors. */

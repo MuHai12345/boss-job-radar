@@ -1,7 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
+import { readFileSync, readdirSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import SqliteDatabase from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ import {
 } from '../src/local-service/runtime';
 import { LOCAL_SERVICE_HOST } from '../src/local-service/server';
 import type { JobObservationInput } from '../src/shared/job-observation-types';
+import { createLave8StructuredLlmProvider } from '../src/domain/llm/lave8-structured-llm-provider';
 
 const JOB_URL = 'https://www.zhipin.com/job_detail/runtime-diagnostics.html';
 const JD = [
@@ -79,7 +81,7 @@ async function analyze(runtime: LocalRuntime, jobUrl = JOB_URL): Promise<LocalRe
   const session = await send(runtime.address.port, 'GET', '/bridge/session');
   expect(session.statusCode).toBe(200);
   const token = (JSON.parse(session.body) as { token: string }).token;
-  return send(
+  const response = await send(
     runtime.address.port,
     'POST',
     '/structured-llm-analyses',
@@ -90,6 +92,32 @@ async function analyze(runtime: LocalRuntime, jobUrl = JOB_URL): Promise<LocalRe
     },
     JSON.stringify({ jobUrl }),
   );
+  const directory = join(dirname(runtimePaths.get(runtime)!), 'safe-diagnostics');
+  const logs = readdirSync(directory).filter(name => name.endsWith('.log'));
+  expect(logs.length).toBeGreaterThan(0);
+  for (const log of logs) {
+    const text = readFileSync(join(directory, log), 'utf8');
+    const events = text.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+    const attemptId = events[0]!.attemptId;
+    expect(new Set(events.map(event => event.attemptId)).size).toBe(1);
+    expect(events.filter(event => event.event === 'request_accepted')).toHaveLength(1);
+    expect(events.filter(event => event.event === 'result')).toHaveLength(1);
+    for (const event of events) expect(event.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    const summaryText = readFileSync(join(directory, `safe-evidence-attempt-${String(attemptId)}.json`), 'utf8');
+    const summary = JSON.parse(summaryText) as Record<string, unknown>;
+    expect(summary.outcome).toBe(events.at(-1)!.outcome);
+    expect(summary.finishedAt).toBe(events.at(-1)!.timestamp);
+    if (summary.outcome === 'ok') expect(summary.analysisId).toBeGreaterThan(0);
+    else expect(summary).not.toHaveProperty('analysisId');
+    for (const event of events.filter(event => event.scope === 'analysis')) {
+      expect(summary.stage).toBe(event.stage);
+      if (event.stage === 'output_validation_failed') expect(summary.validationReason).toBe(event.validationReason);
+    }
+    expect(text + summaryText).not.toContain(JD);
+    expect(text + summaryText).not.toMatch(/PRIVATE_|zhipin\.com|诊断测试公司|Authorization|Cookie|Session/);
+    expect(text + summaryText).not.toContain(directory);
+  }
+  return response;
 }
 
 function observation(overrides: Partial<JobObservationInput> = {}): JobObservationInput {
@@ -190,6 +218,32 @@ function expectGeneric502(response: LocalResponse): void {
 }
 
 describe('structured LLM runtime fixed failure-stage diagnostics', () => {
+  it.each([true, false])('correlates localhost, Lave8 and strict validator events with pre-fetch evidence (valid=%s)', async valid => {
+    const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
+    const fetchImpl = vi.fn(async () => {
+      const directory = join(dirname(runtimePaths.get(runtime)!), 'safe-diagnostics');
+      const log = readdirSync(directory).find(name => name.endsWith('.log'))!;
+      expect(readFileSync(join(directory, log), 'utf8')).toContain('request_accepted');
+      return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify(valid ? validOutput() : { roleSummary: 'PRIVATE_INVALID_OUTPUT' }) }] }] }));
+    });
+    const runtime = await start(createLave8StructuredLlmProvider({ apiKey: 'PRIVATE_FAKE_KEY', modelId: 'gpt-5.6-sol', fetchImpl }), events);
+    seed(runtime);
+    const response = await analyze(runtime);
+    if (valid) expect(response.statusCode).toBe(200);
+    else expectGeneric502(response);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const directory = join(dirname(runtimePaths.get(runtime)!), 'safe-diagnostics');
+    const log = readdirSync(directory).find(name => name.endsWith('.log'))!;
+    const records = readFileSync(join(directory, log), 'utf8').trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+    expect(new Set(records.map(event => event.attemptId)).size).toBe(1);
+    expect(records.map(event => event.event ?? event.stage)).toEqual(['created', 'request_accepted', 'request_started', 'http_response', 'response_accepted', ...(valid ? [] : ['output_validation_failed']), 'result']);
+    const summaryName = readdirSync(directory).find(name => name.endsWith('.json'))!;
+    const summary = JSON.parse(readFileSync(join(directory, summaryName), 'utf8'));
+    expect(summary).toMatchObject({ provider: 'lave8', model: 'gpt-5.6-sol', providerTimeoutMs: 90_000, responseAccepted: true,
+      ...(valid ? { outcome: 'ok', analysisId: JSON.parse(response.body).id } : { stage: 'output_validation_failed', validationReason: 'unexpected_object_shape' }),
+    });
+    if (valid) expect(summary).not.toHaveProperty('validationReason');
+  });
   it('maps provider failure to provider_failed and preserves the generic 502 contract', async () => {
     const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
     const provider = fakeProvider({ generate() { throw new Error('PRIVATE_PROVIDER_DETAIL'); } });
@@ -198,7 +252,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'provider_failed' }]);
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'provider_failed' }]);
   });
 
   it('maps structured output rejection to a fixed validation reason without exposing output', async () => {
@@ -209,7 +263,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{
+    expect(events).toMatchObject([{
       scope: 'analysis',
       stage: 'output_validation_failed',
       validationReason: 'unexpected_object_shape',
@@ -235,7 +289,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{
+    expect(events).toMatchObject([{
       scope: 'analysis',
       stage: 'output_validation_failed',
       validationReason: 'full_jd_excerpt_not_exact',
@@ -260,7 +314,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{
+    expect(events).toMatchObject([{
       scope: 'analysis',
       stage: 'output_validation_failed',
       validationReason: 'structured_evidence_code_not_allowed',
@@ -278,7 +332,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(0);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'invalid_source' }]);
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'invalid_source' }]);
   });
 
   it('maps a source mutation during provider await to source_changed and persists no stale analysis', async () => {
@@ -300,7 +354,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'source_changed' }]);
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'source_changed' }]);
     expect(inspect(runtime, (database) => database.prepare('SELECT COUNT(*) AS count FROM structured_llm_analyses').get())).toEqual({ count: 0 });
   });
 
@@ -318,7 +372,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'stored_analysis_invalid' }]);
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'stored_analysis_invalid' }]);
   });
 
   it('maps unknown persistence failures to internal_or_persistence and leaks no SQLite detail', async () => {
@@ -336,7 +390,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'internal_or_persistence' }]);
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'internal_or_persistence' }]);
     expect(JSON.stringify(events)).not.toContain('PRIVATE_SQLITE_DIAGNOSTIC_SENTINEL');
   });
 
@@ -354,7 +408,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     expect(unavailable.statusCode).toBe(422);
     expect(JSON.parse(unavailable.body)).toEqual({ error: 'analysis_unavailable' });
     expect(provider.calls).toBe(0);
-    expect(events).toEqual([]);
+    expect(events).toMatchObject([]);
   });
 
   it('ignores a diagnostic callback failure and rethrows the original provider failure to the generic HTTP boundary', async () => {

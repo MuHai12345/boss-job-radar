@@ -85,7 +85,8 @@ describe('OpenAI structured LLM provider configuration', () => {
     }
 
     const current = provider(fetchImpl);
-    expect(Object.keys(current).sort()).toEqual(['generate', 'modelId', 'providerId']);
+    expect(Object.keys(current).sort()).toEqual(['generate', 'modelId', 'providerId', 'timeoutMs']);
+    expect(current.timeoutMs).toBe(OPENAI_STRUCTURED_LLM_TIMEOUT_MS);
     expect(JSON.stringify(current)).not.toContain(SECRET);
   });
 });

@@ -20,6 +20,7 @@ import {
 import { startLocalRuntime, type StructuredLlmAnalysisDiagnosticEvent } from './runtime.js';
 import { LOCAL_SERVICE_HOST, type AnalysisHttpDiagnosticEvent } from './server.js';
 import { formatStartupError } from './startup-error.js';
+import { LOCAL_BUILD_ID } from './build-identity.js';
 
 function logStructuredLlmDiagnostic(event: Lave8StructuredLlmDiagnosticEvent | StructuredLlmAnalysisDiagnosticEvent | AnalysisHttpDiagnosticEvent): void {
   console.log(`BJR_LLM_DIAGNOSTIC ${JSON.stringify(event)}`);
@@ -37,6 +38,7 @@ let sensitiveValues: readonly (string | undefined)[] = [
 ];
 
 try {
+  if (LOCAL_BUILD_ID === 'unbuilt') throw new Error('Local service requires build:local');
   const llmConfig = parseStructuredLlmRuntimeConfig(
     openAiApiKey,
     process.env[BOSS_JOB_RADAR_OPENAI_MODEL_ENV],
@@ -75,6 +77,7 @@ try {
     `Boss Job Radar local service listening on http://${LOCAL_SERVICE_HOST}:${runtime.address.port}`,
   );
   console.log('Local database ready');
+  console.log(`BJR_RUNTIME_IDENTITY ${JSON.stringify({ timestamp: new Date().toISOString(), ...runtime.identity })}`);
 
   let shutdownPromise: Promise<void> | undefined;
   const shutdown = (): void => {

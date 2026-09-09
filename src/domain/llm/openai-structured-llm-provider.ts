@@ -68,7 +68,7 @@ export function createOpenAiStructuredLlmProvider(options: OpenAiStructuredLlmPr
 
     // The secret stays in the closure and is used only in Authorization.
     return Object.freeze({
-      providerId: 'openai', modelId,
+      providerId: 'openai', modelId, timeoutMs: OPENAI_STRUCTURED_LLM_TIMEOUT_MS,
       async generate(request: StructuredLlmProviderRequest): Promise<unknown> {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {

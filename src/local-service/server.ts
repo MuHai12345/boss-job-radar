@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { emitAttemptDiagnostic, runAnalysisAttempt, type AttemptEvidenceStore, type DiagnosticMetadata } from './analysis-attempt-context.js';
 
 import type { ImportRequest } from '../shared/import-request-types.js';
 import { validateStructuredLlmAnalysisRequest } from '../shared/structured-llm-analysis-request.js';
@@ -57,24 +58,22 @@ export interface StructuredLlmAnalysisWriter {
   >;
 }
 
-export type AnalysisHttpDiagnosticEvent = {
+export type AnalysisHttpDiagnosticEvent = DiagnosticMetadata & {
   readonly scope: 'analysis_http';
   readonly ordinal: number;
 } & (
   | { readonly event: 'request_accepted' }
-  | { readonly event: 'result'; readonly outcome: 'ok' | 'job_not_found' | 'analysis_unavailable' | 'analysis_failed' }
+  | { readonly event: 'result'; readonly outcome: 'ok' | 'job_not_found' | 'analysis_unavailable' | 'analysis_failed'; readonly analysisId?: number }
 );
 
-// Shared by service instances in this process; never persisted or transported.
+// Process-local ordering aid; persisted in safe evidence, never a request identity.
 let analysisHttpOrdinal = 0;
 
 function emitAnalysisHttpDiagnosticSafely(
   callback: ((event: AnalysisHttpDiagnosticEvent) => void) | undefined,
   event: AnalysisHttpDiagnosticEvent,
 ): void {
-  try { callback?.(event); } catch {
-    // Observer failures must not affect the writer or HTTP response.
-  }
+  emitAttemptDiagnostic(event, callback);
 }
 
 function sendJson(
@@ -121,6 +120,7 @@ async function handleProtectedWriteRequest(
   linkChecks: JobLinkCheckWriter | undefined,
   structuredLlmAnalyses: StructuredLlmAnalysisWriter | undefined,
   onAnalysisHttpDiagnostic: ((event: AnalysisHttpDiagnosticEvent) => void) | undefined,
+  attemptEvidence: AttemptEvidenceStore | undefined,
 ): Promise<void> {
   if (!hasExpectedLoopbackHost(request)) {
     rejectWithoutReadingBody(request, response, 403, 'forbidden');
@@ -185,29 +185,33 @@ async function handleProtectedWriteRequest(
       sendJson(response, 503, { error: 'analysis_not_configured' });
       return;
     }
-    const ordinal = ++analysisHttpOrdinal;
-    emitAnalysisHttpDiagnosticSafely(onAnalysisHttpDiagnostic, { scope: 'analysis_http', event: 'request_accepted', ordinal });
-    let outcome: Extract<AnalysisHttpDiagnosticEvent, { event: 'result' }>['outcome'] = 'analysis_failed';
-    try {
-      const result = await structuredLlmAnalyses.analyzeJobUrl(analysisRequest.jobUrl);
-      if (result.status === 'job_not_found') {
-        outcome = 'job_not_found';
-        sendJson(response, 404, { error: 'job_not_found' });
-      } else if (result.status === 'analysis_unavailable') {
-        outcome = 'analysis_unavailable';
-        sendJson(response, 422, { error: 'analysis_unavailable' });
-      } else if (result.status === 'ok' && Number.isSafeInteger(result.id) && result.id > 0) {
-        outcome = 'ok';
-        sendJson(response, 200, { id: result.id });
-      } else {
+    await runAnalysisAttempt(attemptEvidence, async () => {
+      const ordinal = ++analysisHttpOrdinal;
+      emitAnalysisHttpDiagnosticSafely(onAnalysisHttpDiagnostic, { scope: 'analysis_http', event: 'request_accepted', ordinal });
+      let outcome: Extract<AnalysisHttpDiagnosticEvent, { event: 'result' }>['outcome'] = 'analysis_failed';
+      let analysisId: number | undefined;
+      try {
+        const result = await structuredLlmAnalyses.analyzeJobUrl(analysisRequest.jobUrl);
+        if (result.status === 'job_not_found') {
+          outcome = 'job_not_found';
+          sendJson(response, 404, { error: 'job_not_found' });
+        } else if (result.status === 'analysis_unavailable') {
+          outcome = 'analysis_unavailable';
+          sendJson(response, 422, { error: 'analysis_unavailable' });
+        } else if (result.status === 'ok' && Number.isSafeInteger(result.id) && result.id > 0) {
+          outcome = 'ok';
+          analysisId = result.id;
+          sendJson(response, 200, { id: result.id });
+        } else {
+          sendJson(response, 502, { error: 'analysis_failed' });
+        }
+      } catch {
+        outcome = 'analysis_failed';
         sendJson(response, 502, { error: 'analysis_failed' });
+      } finally {
+        emitAnalysisHttpDiagnosticSafely(onAnalysisHttpDiagnostic, { scope: 'analysis_http', event: 'result', ordinal, outcome, ...(outcome === 'ok' ? { analysisId } : {}) });
       }
-    } catch {
-      outcome = 'analysis_failed';
-      sendJson(response, 502, { error: 'analysis_failed' });
-    } finally {
-      emitAnalysisHttpDiagnosticSafely(onAnalysisHttpDiagnostic, { scope: 'analysis_http', event: 'result', ordinal, outcome });
-    }
+    });
     return;
   }
 
@@ -254,6 +258,7 @@ async function handleRequest(
   linkChecks: JobLinkCheckWriter | undefined,
   structuredLlmAnalyses: StructuredLlmAnalysisWriter | undefined,
   onAnalysisHttpDiagnostic: ((event: AnalysisHttpDiagnosticEvent) => void) | undefined,
+  attemptEvidence: AttemptEvidenceStore | undefined,
 ): Promise<void> {
   if (request.url === HEALTH_PATH) {
     handleHealthRequest(request, response);
@@ -288,6 +293,7 @@ async function handleRequest(
       linkChecks,
       structuredLlmAnalyses,
       onAnalysisHttpDiagnostic,
+      attemptEvidence,
     );
     return;
   }
@@ -297,6 +303,7 @@ async function handleRequest(
 }
 
 export async function startLocalService(options: {
+  readonly attemptEvidence?: AttemptEvidenceStore;
   readonly imports: ImportBatchWriter;
   readonly linkChecks?: JobLinkCheckWriter;
   readonly structuredLlmAnalyses?: StructuredLlmAnalysisWriter;
@@ -313,6 +320,7 @@ export async function startLocalService(options: {
       options.linkChecks,
       options.structuredLlmAnalyses,
       options.onAnalysisHttpDiagnostic,
+      options.attemptEvidence,
     ).catch(() => {
       if (!response.headersSent) {
         sendJson(response, 500, { error: 'internal_error' });

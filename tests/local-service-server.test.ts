@@ -1,6 +1,7 @@
 import { request } from 'node:http';
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { AttemptEvidenceStore } from '../src/local-service/analysis-attempt-context';
 
 import {
   LOCAL_SERVICE_HOST,
@@ -62,6 +63,7 @@ describe('loopback-only local service', () => {
     expectTypeOf<Parameters<typeof startLocalService>>().toEqualTypeOf<
       [
         options: {
+          readonly attemptEvidence?: AttemptEvidenceStore;
           readonly imports: ImportBatchWriter;
           readonly linkChecks?: JobLinkCheckWriter;
           readonly structuredLlmAnalyses?: StructuredLlmAnalysisWriter;

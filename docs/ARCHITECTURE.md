@@ -61,3 +61,9 @@ Chrome / Edge MV3 浏览器扩展
 - Chrome / Edge Manifest V3
 
 工具链批准不改变本文既有安全边界。各批次仍只能实现外部 Prompt 明确允许的范围。
+
+## Structured LLM 评估证据基础设施（等待外部审阅）
+
+local-service 构建产物携带内容摘要身份，运行实例另有随机 runtimeId 与 startedAt。localhost 接受显式分析前，先建立独立 attempt 日志；AsyncLocalStorage 将 HTTP、Lave8 和分析失败事件关联到同一 UUID。事件携带本机 ISO 时间并逐条 fsync，summary 独立原子替换。日志位于数据库目录下的 safe-diagnostics，输出中不包含该绝对路径。
+
+初始日志无法建立时不接受分析；后续诊断写盘失败不重试 provider，不丢弃此前已写入的日志。Side Panel 恢复旧失败时明确标为历史状态。完整设计和故障边界见 [ADR-0023](decisions/ADR-0023-real-evaluation-evidence-infrastructure.md)。本轮不包含真实 provider 调用或 representative sample，Capability 12 仍为 IN_PROGRESS。

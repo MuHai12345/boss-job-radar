@@ -18,7 +18,7 @@ let activeTab: Tab | undefined;
 let windowId: number | undefined;
 let ready = false;
 let busy = false;
-let notice = '最近进度会自动保留在此浏览器中。';
+let notice = '本次打开尚未发起新的 AI 分析请求。最近进度会自动保留在此浏览器中。';
 let pageRevision = 0;
 let queryRevision = 0;
 let storageRevision = 0;
@@ -103,7 +103,7 @@ async function perform(action: Action): Promise<void> {
   state.error = null;
   state.pending = action;
   state.lastOperationAt = new Date().toISOString();
-  notice = action === 'analyze' ? '正在分析当前岗位，请稍候…' : action === 'link_check' ? '正在检查当前岗位链接状态…' : action === 'save' ? '正在重新读取并保存当前岗位…' : '正在读取当前页的岗位信息…';
+  notice = action === 'analyze' ? '正在处理本次显式 AI 分析请求，请稍候；是否被本地服务接受以本次证据为准。' : action === 'link_check' ? '正在检查当前岗位链接状态…' : action === 'save' ? '正在重新读取并保存当前岗位…' : '正在读取当前页的岗位信息…';
   render();
   try {
     // Persist the uncertainty before issuing a request; reopening never replays it.

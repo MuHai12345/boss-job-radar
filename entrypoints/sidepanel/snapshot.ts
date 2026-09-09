@@ -12,6 +12,8 @@ export const messages = {
   service: '本地服务未启动或无法连接。',
   save: '本次未能确认保存成功，请稍后重新保存。',
   analysis: '本次未能确认 AI 分析成功，请稍后查看本地记录；不会自动重试。手动再次点击 AI 分析会开始一次新的分析尝试，可能再次发起远程请求并产生 API 费用。',
+  historical_analysis: '历史最近一次 AI 分析未能确认成功。这是恢复的旧状态，本次打开尚未发起新的 AI 分析请求；不会自动重试。手动再次点击 AI 分析会开始一次新的分析尝试，可能再次发起远程请求并产生 API 费用。',
+  historical_analysis_pending: '历史 AI 分析请求的完成状态尚未确认。本次打开尚未发起新的 AI 分析请求；本地服务可能仍在处理上次请求，请以对应证据文件为准；不会自动重试。',
   job_not_found: '请先把当前岗位保存到本地，再进行 AI 分析。',
   analysis_unavailable: '当前岗位缺少完整职位描述，请重新保存岗位详情。',
   analysis_not_configured: '本地 AI 分析尚未配置。',
@@ -145,7 +147,9 @@ export async function loadSnapshot(): Promise<UiSnapshot> {
   const stored = await browser.storage.local.get(STORAGE_KEY);
   const snapshot = sanitizeSnapshot(stored[STORAGE_KEY]);
   snapshot.viewingPrevious = true;
-  if (snapshot.pending) snapshot.error = 'interrupted';
+  if (snapshot.error === 'analysis') snapshot.error = 'historical_analysis';
+  if (snapshot.pending === 'analyze') snapshot.error = 'historical_analysis_pending';
+  else if (snapshot.pending) snapshot.error = 'interrupted';
   snapshot.pending = null;
   return snapshot;
 }
