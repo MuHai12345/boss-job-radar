@@ -6,21 +6,25 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN_PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 5B — Lave8 background compatibility repair — PASS`
+- 最近完成批次：`Phase 6 / Batch 5B — Lave8 long-response timeout repair — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
 - 核心能力矩阵：`12 / 15 VERIFIED`
 - Lave8 provider：`lave8`
 - Lave8 endpoint：`https://lave8.com/v1/responses`
 - Lave8 当前唯一批准 model：`gpt-5.6-sol`
 - `gpt-6-astra`：已退出当前产品 allowlist；不再继续做 Responses Lite 适配
-- 当前 Lave8 wire compatibility：`background` property 已基于真实 HTTP 400 safe evidence 从 Lave8 request body 省略；其他 wire 字段保持不变
+- 当前 Lave8 wire compatibility：`background` property 已基于真实 HTTP 400 safe evidence 从 Lave8 request body 省略；其他 request shape 保持不变
 - Sol switch 产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`
 - Background repair 产品 commit：`5a5a5e634d845eb30a9aee723a31a9b447db0bc0`
-- Background repair 最终外部测试 head：`9bb38ee55e03227879ca6b83131f32c083f60d11`
-- Background repair 最终工程 CI：`34315354975` — **57 test files / 776 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
+- Safe output validation diagnostics 产品 commit：`a6e78e996d5180a6eb7806b5daff4ba4d748281c`
+- Long-response timeout repair 产品 commit：`6429d41322864d93446a8fdda2a950d1229fd276`
+- 当前 Lave8 provider timeout：`90s`
+- 当前 browser/local analysis deadline：`100s`
+- 最新外部测试 head：`4cf30d6d15f05d6ec5a0a992f4128a3635482c76`
+- 最新工程 CI：`34327704721` — **58 test files / 783 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
 - 当前产品实现阻塞：无
-- 当前验证阻塞：尚无真实 `gpt-5.6-sol` 2xx → `response_accepted` → strict validator → SQLite representative sample
-- 下一步：按 `docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`，在本地同步/构建包含 background repair 后，只做一次新的用户显式 Sol 真实分析
+- 当前验证阻塞：尚无真实 `gpt-5.6-sol` strict validator → SQLite representative sample
+- 下一步：使用已验证的 90s provider / 100s browser deadline，只做一次新的用户显式 Sol 真实分析；若 validator 失败，读取 fixed `validationReason`，若通过则验证 SQLite sample 与业务质量
 
 ## 已验证核心能力
 
@@ -53,24 +57,27 @@ Capability 12 已通过外部工程验证的部分包括：
 - official OpenAI Responses transport；
 - local opt-in config、startup secret sanitization；
 - protected localhost explicit analysis trigger；
-- explicit browser user trigger、50 秒 browser deadline、zero automatic retry；
+- explicit browser user trigger、当前 100 秒 browser/local analysis deadline、zero automatic retry；
 - persistent Side Panel；
 - canonical BOSS detail URL handling；
 - 独立 Lave8 provider + fixed relay endpoint；
 - Bearer secret boundary；
 - strict Responses request/schema/parser；
-- 45 秒 provider timeout、zero retry / zero fallback / max one fetch；
+- 当前 90 秒 Lave8 provider timeout、zero retry / zero fallback / max one fetch；
 - secret-safe relay/runtime diagnostics；
 - accepted localhost analysis ordinal + fixed result diagnostics；
 - fixed non-2xx request parameter / error structure / error type / error code categories；
 - bounded token-aware fixed-enum `messageHints`，不反射 raw provider error；
+- fixed `StructuredLlmOutputValidationReason`，validator failure 只输出固定 reason，不记录模型原文/JD/excerpt/code；
 - Side Panel 明确提示手动再次点击属于新远程尝试并可能产生新 API 费用；
 - 当前 Lave8 production model allowlist 已切换并外部验证为仅 `gpt-5.6-sol`；
-- 真实 Sol one-click 失败已验证 cost boundary 为 1 accepted localhost / 1 provider start / 0 retry；
-- 该真实 400 的 safe diagnostics 给出 `errorType=invalid_request` + `messageHints=["unsupported","background"]`；
-- 基于该证据，Lave8 request body 现已省略 `background`，其余 endpoint/model/store/stream/reasoning/max_output_tokens/input/strict schema/parser/timeout/diagnostics 均保持，并已完整 CI 验证。
+- 真实 Sol one-click 调用已验证 cost boundary 为 1 accepted localhost / 1 provider start / 0 retry；
+- 真实 HTTP 400 safe diagnostics 给出 `errorType=invalid_request` + `messageHints=["unsupported","background"]`；
+- 基于该证据，Lave8 request body 省略 `background`，其余 request shape 保持；
+- 后续真实 Sol 调用曾达到 HTTP 200 + `response_accepted`，证明 relay/Responses transport 可通；该次随后被本地 strict validator 拒绝，因此增加 fixed-safe validation reason diagnostics；
+- 最近一次真实调用在旧 45s provider deadline 上超时，仍满足 1 accepted / 1 provider start / 0 retry；基于该证据，Lave8 timeout 扩为 90s，browser/local deadline 扩为 100s，完整 CI 已通过。
 
-Capability 12 仍为 `IN_PROGRESS`，因为缺少 background repair 之后的真实 2xx end-to-end representative sample 与外部 grounding / business-usability 验收。
+Capability 12 仍为 `IN_PROGRESS`，因为缺少 strict validator 通过并落入 SQLite 的 representative real sample，以及随后 grounding / business-usability 外部验收。
 
 ## Phase 6 批次记录
 
@@ -174,22 +181,59 @@ Evidence classification：`B — RESPONSES_LITE_COMPATIBILITY_IS_WEAK_LEAD`。
 
 记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-background-compatibility-external-verification.md`
 
+### Batch 5B safe output validation diagnostics — PASS
+
+Background repair 后的一次受控真实 Sol 调用首次达到 HTTP 200 + `lave8/response_accepted`，但随后进入本地 `output_validation_failed`。为避免继续猜测，产品增加固定 `StructuredLlmOutputValidationReason`，只记录固定原因类别，不泄露 raw provider output、JD/excerpt、structured code 或 arbitrary error text；validator semantics 不放宽。
+
+产品 commit：`a6e78e996d5180a6eb7806b5daff4ba4d748281c`
+
+最终外部测试 head：`b6339a185df7536cc15acc56471c044d6657b8e3`
+
+最终 CI：`34317030455` — **58 test files / 783 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+
+记录：`docs/verification/2026-09-09-phase-6-batch-5b-safe-output-validation-diagnostics-external-verification.md`
+
+### Batch 5B Lave8 long-response timeout repair — PASS
+
+增加 validation reason 后的下一次受控真实 Sol 调用没有收到 HTTP response，而是在旧 45 秒 provider deadline 上超时。Safe sequence 为 1 accepted localhost / 1 `lave8/request_started` / `lave8/timeout` / provider_failed，仍然没有 retry/fallback。
+
+考虑到此前已证明同一 Sol relay 可到达 HTTP 200 + `response_accepted`，本批只扩展等待窗口，不改变 wire request/validator：
+
+- Lave8 provider timeout：45s → 90s
+- browser/local analysis deadline：50s → 100s
+
+产品 commit：`6429d41322864d93446a8fdda2a950d1229fd276`
+
+最终外部测试 head：`4cf30d6d15f05d6ec5a0a992f4128a3635482c76`
+
+最终 CI：`34327704721` — **58 test files / 783 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+
+记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-timeout-repair-external-verification.md`
+
 ## 当前真实验证门槛
 
 当前批准计划：`docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`
 
-下一次只允许一次新的用户显式真实调用，并且本地源码/编译产物必须包含 `5a5a5e634d845eb30a9aee723a31a9b447db0bc0`：
+下一次只允许一次新的用户显式真实调用，并且本地源码/编译产物必须包含：
 
-1. 用户本机安全输入 Lave8 API key；
+- `5a5a5e634d845eb30a9aee723a31a9b447db0bc0` — background omitted
+- `a6e78e996d5180a6eb7806b5daff4ba4d748281c` — fixed validationReason diagnostics
+- `6429d41322864d93446a8fdda2a950d1229fd276` — 90s provider / 100s browser deadline
+
+验证要求：
+
+1. Lave8 key 只在用户本机可用；外部 ChatGPT/Codex 不接触 secret；
 2. local service 使用 `BOSS_JOB_RADAR_LAVE8_MODEL=gpt-5.6-sol`，startup 保持 0 relay calls；
 3. Lave8 request body 必须省略 `background`；
 4. 用户在已保存且有完整 JD 的真实 BOSS detail page 打开 Side Panel；
 5. 用户只点击一次 `AI 分析当前岗位`；
 6. 必须同时记录 `analysis_http/request_accepted` count/ordinal 与 `lave8/request_started` count；
 7. one-click 预期 1 accepted localhost request / 1 provider request / 0 automatic retry / 0 fallback；
-8. 成功时 provider 2xx、`response_accepted`、strict validator 通过，并只新增一个 `provider=lave8` / `model=gpt-5.6-sol` analysis row；
-9. 成功后导出 sanitized representative sample；
-10. 外部 ChatGPT 完成 grounding、业务可用性与 secret/error/cost safety 验收。
+8. provider 最多等待 90s，browser/local request 最多等待 100s；
+9. 若 provider 2xx + `response_accepted` 后 validator 失败，必须读取 fixed `validationReason`，不再猜测或立即重试；
+10. 若 validator 通过，则只新增一个 `provider=lave8` / `model=gpt-5.6-sol` analysis row；
+11. 成功后导出 sanitized representative sample；
+12. 外部 ChatGPT 完成 grounding、业务可用性与 secret/error/cost safety 验收。
 
 真实 sample 通过后，才能考虑：
 
