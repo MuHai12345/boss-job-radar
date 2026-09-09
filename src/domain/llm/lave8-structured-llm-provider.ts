@@ -7,7 +7,7 @@ import {
 
 export type { Lave8StructuredLlmDiagnosticEvent } from './lave8-structured-llm-diagnostics.js';
 
-export const LAVE8_STRUCTURED_LLM_TIMEOUT_MS = 45_000;
+export const LAVE8_STRUCTURED_LLM_TIMEOUT_MS = 90_000;
 export const LAVE8_STRUCTURED_LLM_ENDPOINT = 'https://lave8.com/v1/responses';
 export const LAVE8_STRUCTURED_LLM_MODEL_IDS = Object.freeze(['gpt-5.6-sol'] as const);
 

@@ -7,7 +7,7 @@ import {
 
 export const LOCAL_SERVICE_BASE_URL = 'http://127.0.0.1:32123';
 const REQUEST_TIMEOUT_MS = 5_000;
-export const STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS = 50_000;
+export const STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS = 100_000;
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/u;
 
 export type LocalServiceSaveFailureCode =
