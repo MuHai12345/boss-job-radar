@@ -27,26 +27,27 @@ describe('Lave8 runtime configuration', () => {
 
   it('accepts only the approved Lave8 model and preserves the original relay secret value', () => {
     const apiKey = '  relay-private-key  ';
-    expect(parseStructuredLlmRuntimeConfig(undefined, undefined, apiKey, 'gpt-6-astra')).toEqual({
+    expect(parseStructuredLlmRuntimeConfig(undefined, undefined, apiKey, 'gpt-5.6-sol')).toEqual({
       enabled: true,
       provider: 'lave8',
       apiKey,
-      modelId: 'gpt-6-astra',
+      modelId: 'gpt-5.6-sol',
     });
   });
 
   it('fails closed for partial/invalid Lave8 configuration and simultaneous providers', () => {
     const invalidCases: readonly (readonly [unknown, unknown, unknown, unknown])[] = [
       [undefined, undefined, 'relay-key', undefined],
-      [undefined, undefined, undefined, 'gpt-6-astra'],
-      [undefined, undefined, '', 'gpt-6-astra'],
-      [undefined, undefined, '   ', 'gpt-6-astra'],
-      [undefined, undefined, 'bad\nkey', 'gpt-6-astra'],
+      [undefined, undefined, undefined, 'gpt-5.6-sol'],
+      [undefined, undefined, '', 'gpt-5.6-sol'],
+      [undefined, undefined, '   ', 'gpt-5.6-sol'],
+      [undefined, undefined, 'bad\nkey', 'gpt-5.6-sol'],
       [undefined, undefined, 'relay-key', ''],
       [undefined, undefined, 'relay-key', 'gpt-6'],
-      [undefined, undefined, 'relay-key', ' gpt-6-astra'],
-      ['openai-key', 'gpt-5.6-terra', 'relay-key', 'gpt-6-astra'],
-      ['openai-key', undefined, 'relay-key', 'gpt-6-astra'],
+      [undefined, undefined, 'relay-key', 'gpt-6-astra'],
+      [undefined, undefined, 'relay-key', ' gpt-5.6-sol'],
+      ['openai-key', 'gpt-5.6-terra', 'relay-key', 'gpt-5.6-sol'],
+      ['openai-key', undefined, 'relay-key', 'gpt-5.6-sol'],
     ];
 
     for (const args of invalidCases) {
