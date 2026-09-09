@@ -51,7 +51,7 @@ function completedResponse(payload: unknown, includeReasoning = true): unknown {
   };
 }
 
-function provider(fetchImpl: typeof fetch, modelId = 'gpt-6-astra') {
+function provider(fetchImpl: typeof fetch, modelId = 'gpt-5.6-sol') {
   return createLave8StructuredLlmProvider({
     apiKey: SECRET,
     modelId,
@@ -67,14 +67,14 @@ describe('Lave8 structured LLM provider configuration', () => {
   it('uses independent provider identity, a fixed endpoint, and only the approved model', () => {
     expect(LAVE8_STRUCTURED_LLM_ENDPOINT).toBe('https://lave8.com/v1/responses');
     expect(Object.isFrozen(LAVE8_STRUCTURED_LLM_MODEL_IDS)).toBe(true);
-    expect(LAVE8_STRUCTURED_LLM_MODEL_IDS).toEqual(['gpt-6-astra']);
+    expect(LAVE8_STRUCTURED_LLM_MODEL_IDS).toEqual(['gpt-5.6-sol']);
 
     const fetchImpl: typeof fetch = async () => responseJson(completedResponse({ ok: true }));
     const current = provider(fetchImpl);
     expect(current.providerId).toBe('lave8');
-    expect(current.modelId).toBe('gpt-6-astra');
+    expect(current.modelId).toBe('gpt-5.6-sol');
 
-    for (const modelId of ['', 'gpt-6', 'gpt-5.6-sol', ' gpt-6-astra', 'gpt-6-astra ']) {
+    for (const modelId of ['', 'gpt-6', 'gpt-6-astra', ' gpt-5.6-sol', 'gpt-5.6-sol ']) {
       expect(() => provider(fetchImpl, modelId)).toThrow(
         'Invalid Lave8 structured LLM provider configuration',
       );
@@ -84,7 +84,7 @@ describe('Lave8 structured LLM provider configuration', () => {
   it('validates the relay secret without exposing it on the provider object', () => {
     const fetchImpl: typeof fetch = async () => responseJson(completedResponse({ ok: true }));
     for (const apiKey of ['', '   ', 'bad\nkey', 'bad\u0000key']) {
-      expect(() => createLave8StructuredLlmProvider({ apiKey, modelId: 'gpt-6-astra', fetchImpl })).toThrow(
+      expect(() => createLave8StructuredLlmProvider({ apiKey, modelId: 'gpt-5.6-sol', fetchImpl })).toThrow(
         'Invalid Lave8 structured LLM provider configuration',
       );
     }
@@ -120,7 +120,7 @@ describe('Lave8 Responses request contract', () => {
     expect(rawBody).not.toContain(SECRET);
     const body = JSON.parse(rawBody) as Record<string, unknown>;
     expect(body).toMatchObject({
-      model: 'gpt-6-astra',
+      model: 'gpt-5.6-sol',
       store: false,
       background: false,
       stream: false,
