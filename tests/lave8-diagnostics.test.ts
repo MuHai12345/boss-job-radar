@@ -83,30 +83,31 @@ describe('Lave8 secret-safe diagnostic classifiers', () => {
 
   it('summarizes only fixed error structure/type/code categories without reading message accessors', () => {
     expect(summarizeLave8Error(undefined)).toEqual({
-      bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent',
+      bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent', messageHints: [],
     });
     expect(summarizeLave8Error({ ok: false })).toEqual({
-      bodyStructure: 'error_object_absent', errorType: 'absent', errorCode: 'absent',
+      bodyStructure: 'error_object_absent', errorType: 'absent', errorCode: 'absent', messageHints: [],
     });
     expect(summarizeLave8Error({ error: {
       type: 'invalid_request_error', code: 'unsupported_parameter', message: 'PRIVATE_RAW_MESSAGE',
     } })).toEqual({
       bodyStructure: 'error_object_present', errorType: 'invalid_request', errorCode: 'unsupported_parameter',
+      messageHints: ['other'],
     });
     expect(summarizeLave8Error({ error: {
       type: 'authentication_error', code: 'invalid_api_key',
     } })).toEqual({
-      bodyStructure: 'error_object_present', errorType: 'authentication', errorCode: 'invalid_api_key',
+      bodyStructure: 'error_object_present', errorType: 'authentication', errorCode: 'invalid_api_key', messageHints: [],
     });
     expect(summarizeLave8Error({ error: {
       type: 'rate_limit_error', code: 'insufficient_quota',
     } })).toEqual({
-      bodyStructure: 'error_object_present', errorType: 'rate_limit', errorCode: 'insufficient_quota',
+      bodyStructure: 'error_object_present', errorType: 'rate_limit', errorCode: 'insufficient_quota', messageHints: [],
     });
     expect(summarizeLave8Error({ error: {
       type: 'PRIVATE_EXTERNAL_TYPE', code: 'PRIVATE_EXTERNAL_CODE',
     } })).toEqual({
-      bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other',
+      bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other', messageHints: [],
     });
 
     let messageRead = false;
@@ -119,7 +120,7 @@ describe('Lave8 secret-safe diagnostic classifiers', () => {
       },
     });
     expect(summarizeLave8Error({ error: externalError })).toEqual({
-      bodyStructure: 'error_object_present', errorType: 'server', errorCode: 'context_length',
+      bodyStructure: 'error_object_present', errorType: 'server', errorCode: 'context_length', messageHints: [],
     });
     expect(messageRead).toBe(false);
   });
@@ -167,6 +168,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
         scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'reasoning.effort',
         summary: {
           bodyStructure: 'error_object_present', errorType: 'invalid_request', errorCode: 'unsupported_parameter',
+          messageHints: ['other'],
         },
       },
     ]);
@@ -192,7 +194,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events.at(-1)).toEqual({
       scope: 'lave8', event: 'http_non_2xx', status: 422, requestParameter: 'unknown',
       summary: {
-        bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other',
+        bodyStructure: 'error_object_present', errorType: 'other', errorCode: 'other', messageHints: ['other'],
       },
     });
     expect(JSON.stringify(events)).not.toContain('PRIVATE_');
@@ -209,7 +211,7 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events.at(-1)).toEqual({
       scope: 'lave8', event: 'http_non_2xx', status: 400, requestParameter: 'unknown',
       summary: {
-        bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent',
+        bodyStructure: 'json_object_absent', errorType: 'absent', errorCode: 'absent', messageHints: [],
       },
     });
     expect(JSON.stringify(events)).not.toContain('PRIVATE_NON_JSON_ERROR_BODY');
