@@ -212,8 +212,8 @@ describe('structured LLM browser client response mapping', () => {
 });
 
 describe('structured LLM browser client cost boundary', () => {
-  it('uses a 50 second analysis deadline and never retries a rejected POST', async () => {
-    expect(STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS).toBe(50_000);
+  it('uses a 100 second analysis deadline and never retries a rejected POST', async () => {
+    expect(STRUCTURED_LLM_ANALYSIS_REQUEST_TIMEOUT_MS).toBe(100_000);
     const fetchImplementation = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ protocolVersion: 2, token: TOKEN }, 200))
       .mockRejectedValueOnce(new Error('connection reset after provider may have started'));
@@ -263,7 +263,7 @@ describe('structured LLM browser client cost boundary', () => {
     );
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(50_001);
+    await vi.advanceTimersByTimeAsync(100_001);
     await expect(pending).resolves.toMatchObject({ ok: false, code: 'unavailable' });
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
   });
