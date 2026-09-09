@@ -96,7 +96,7 @@ describe('Lave8 structured LLM provider configuration', () => {
 });
 
 describe('Lave8 Responses request contract', () => {
-  it('sends one fixed relay POST, keeps the secret only in Bearer auth, and preserves the strict Responses shape', async () => {
+  it('sends one fixed relay POST, omits unsupported background, keeps the secret only in Bearer auth, and preserves the strict Responses shape', async () => {
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       calls.push({ input, init });
@@ -122,7 +122,6 @@ describe('Lave8 Responses request contract', () => {
     expect(body).toMatchObject({
       model: 'gpt-5.6-sol',
       store: false,
-      background: false,
       stream: false,
       reasoning: { effort: 'low' },
       max_output_tokens: 4000,
@@ -131,6 +130,7 @@ describe('Lave8 Responses request contract', () => {
         { role: 'user', content: [{ type: 'input_text', text: REQUEST.userPrompt }] },
       ],
     });
+    expect(body).not.toHaveProperty('background');
     for (const forbidden of [
       'tools', 'conversation', 'previous_response_id', 'user', 'metadata',
       'web_search', 'file_search', 'code_interpreter',
@@ -167,7 +167,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
     ['failed', { ...completedResponse({ ok: true }) as Record<string, unknown>, status: 'failed', error: { message: 'PRIVATE_UPSTREAM_ERROR' } }],
     ['queued', { ...completedResponse({ ok: true }) as Record<string, unknown>, status: 'queued' }],
     ['tool output', { ...completedResponse({ ok: true }) as Record<string, unknown>, output: [{ type: 'function_call', name: 'x' }] }],
-    ['chat completions shape', { id: 'chatcmpl_test', choices: [{ message: { role: 'assistant', content: '{"ok":true}' } }] }],
+    ['chat completions shape', { id: 'chatcmpl_test', choices: [{ message: { role: 'assistant', content: '{\"ok\":true}' } }] }],
     ['refusal', {
       ...completedResponse({ ok: true }) as Record<string, unknown>,
       output: [{
