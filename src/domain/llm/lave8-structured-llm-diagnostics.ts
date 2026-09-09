@@ -9,11 +9,42 @@ const REQUEST_PARAMETERS = [
 
 export type Lave8RequestParameter = typeof REQUEST_PARAMETERS[number];
 
+// Each hint appears once; this local order also determines truncation priority.
+const ERROR_MESSAGE_HINT_RULES = [
+  ['model', /model/],
+  ['model_not_found', /(?=.*model)(?=.*(?:not found|does not exist|unknown model))/],
+  ['model_unsupported', /(?=.*model)(?=.*(?:unsupported|not supported))/],
+  ['authentication', /api key|authentication|unauthorized/],
+  ['permission', /permission|forbidden/],
+  ['rate_limit', /rate limit/],
+  ['quota', /quota/],
+  ['unsupported', /unsupported|not supported/],
+  ['unknown_parameter', /unknown parameter|unrecognized parameter/],
+  ['invalid_parameter', /invalid parameter/],
+  ['background', /background/],
+  ['store', /store/],
+  ['stream', /stream/],
+  ['reasoning', /reasoning/],
+  ['reasoning_effort', /(?=.*reasoning)(?=.*effort)/],
+  ['max_output_tokens', /max_output_tokens/],
+  ['input', /input/],
+  ['text_format', /text\.format/],
+  ['json_schema', /json_schema|json schema/],
+  ['schema', /schema/],
+  ['responses_api', /\/v1\/responses|responses api/],
+  ['chat_completions', /chat\/completions|chat completions/],
+  ['endpoint', /endpoint/],
+] as const;
+
+export type Lave8ErrorMessageHint = typeof ERROR_MESSAGE_HINT_RULES[number][0] | 'other';
+
 export interface Lave8ErrorSummary {
   readonly bodyStructure: 'json_object_absent' | 'error_object_absent' | 'error_object_present';
   readonly errorType: 'invalid_request' | 'authentication' | 'rate_limit' | 'server' | 'other' | 'absent';
   readonly errorCode: 'invalid_api_key' | 'model_not_found' | 'unsupported_parameter'
     | 'rate_limit' | 'insufficient_quota' | 'context_length' | 'other' | 'absent';
+  /** Unique local hints, at most 16 in rule order. Unrecognized strings yield ['other']; unavailable messages yield []. */
+  readonly messageHints: readonly Lave8ErrorMessageHint[];
 }
 
 export interface Lave8ResponseStructuralSummary {
@@ -94,7 +125,21 @@ function errorCode(value: unknown): Lave8ErrorSummary['errorCode'] {
   }
 }
 
-/** Fixed local categories only; never read error.message or serialize external data. */
+function errorMessageHints(error: unknown): readonly Lave8ErrorMessageHint[] {
+  if (!isPlainObject(error)) return [];
+  const message = field(error, 'message');
+  if (typeof message !== 'string') return [];
+  // Bound before normalization; the inspected text never leaves this function.
+  const normalized = message.slice(0, 2048).toLowerCase().replace(/\s+/g, ' ');
+  const hints: Lave8ErrorMessageHint[] = [];
+  for (const [hint, pattern] of ERROR_MESSAGE_HINT_RULES) {
+    if (pattern.test(normalized)) hints.push(hint);
+    if (hints.length === 16) break;
+  }
+  return hints.length === 0 ? ['other'] : hints;
+}
+
+/** Fixed local categories only; never emit error.message or serialize external data. */
 export function summarizeLave8Error(body: unknown): Lave8ErrorSummary {
   const bodyPresent = isPlainObject(body);
   const error = bodyPresent ? field(body, 'error') : undefined;
@@ -104,6 +149,7 @@ export function summarizeLave8Error(body: unknown): Lave8ErrorSummary {
       : errorPresent ? 'error_object_present' : 'error_object_absent',
     errorType: errorType(errorPresent ? field(error, 'type') : undefined),
     errorCode: errorCode(errorPresent ? field(error, 'code') : undefined),
+    messageHints: errorMessageHints(errorPresent ? error : undefined),
   };
 }
 
