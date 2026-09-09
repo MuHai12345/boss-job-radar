@@ -6,19 +6,21 @@
 - 分支：`master`
 - Phase 0–5：`PASS`
 - Phase 6：`IN_PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 5B — Lave8 GPT-5.6 Sol production model switch — PASS`
+- 最近完成批次：`Phase 6 / Batch 5B — Lave8 background compatibility repair — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
 - 核心能力矩阵：`12 / 15 VERIFIED`
 - Lave8 provider：`lave8`
 - Lave8 endpoint：`https://lave8.com/v1/responses`
 - Lave8 当前唯一批准 model：`gpt-5.6-sol`
 - `gpt-6-astra`：已退出当前产品 allowlist；不再继续做 Responses Lite 适配
+- 当前 Lave8 wire compatibility：`background` property 已基于真实 HTTP 400 safe evidence 从 Lave8 request body 省略；其他 wire 字段保持不变
 - Sol switch 产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`
-- Sol switch 最终外部测试 head：`c1910dccdd45671aa76087c4239adae2a889aa70`
-- Sol switch 最终工程 CI：`34311086872` — **57 test files / 776 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
+- Background repair 产品 commit：`5a5a5e634d845eb30a9aee723a31a9b447db0bc0`
+- Background repair 最终外部测试 head：`9bb38ee55e03227879ca6b83131f32c083f60d11`
+- Background repair 最终工程 CI：`34315354975` — **57 test files / 776 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
 - 当前产品实现阻塞：无
-- 当前验证阻塞：尚无真实 `gpt-5.6-sol` representative browser → localhost → relay → strict validator → SQLite sample
-- 下一步：按 `docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md` 只做一次新的用户显式 Sol 真实分析
+- 当前验证阻塞：尚无真实 `gpt-5.6-sol` 2xx → `response_accepted` → strict validator → SQLite representative sample
+- 下一步：按 `docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`，在本地同步/构建包含 background repair 后，只做一次新的用户显式 Sol 真实分析
 
 ## 已验证核心能力
 
@@ -63,9 +65,12 @@ Capability 12 已通过外部工程验证的部分包括：
 - fixed non-2xx request parameter / error structure / error type / error code categories；
 - bounded token-aware fixed-enum `messageHints`，不反射 raw provider error；
 - Side Panel 明确提示手动再次点击属于新远程尝试并可能产生新 API 费用；
-- 当前 Lave8 production model allowlist 已切换并外部验证为仅 `gpt-5.6-sol`。
+- 当前 Lave8 production model allowlist 已切换并外部验证为仅 `gpt-5.6-sol`；
+- 真实 Sol one-click 失败已验证 cost boundary 为 1 accepted localhost / 1 provider start / 0 retry；
+- 该真实 400 的 safe diagnostics 给出 `errorType=invalid_request` + `messageHints=["unsupported","background"]`；
+- 基于该证据，Lave8 request body 现已省略 `background`，其余 endpoint/model/store/stream/reasoning/max_output_tokens/input/strict schema/parser/timeout/diagnostics 均保持，并已完整 CI 验证。
 
-Capability 12 仍为 `IN_PROGRESS`，因为缺少 Sol 的真实 end-to-end representative sample 与外部 grounding / business-usability 验收。
+Capability 12 仍为 `IN_PROGRESS`，因为缺少 background repair 之后的真实 2xx end-to-end representative sample 与外部 grounding / business-usability 验收。
 
 ## Phase 6 批次记录
 
@@ -151,33 +156,40 @@ Evidence classification：`B — RESPONSES_LITE_COMPATIBILITY_IS_WEAK_LEAD`。
 
 产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`
 
-外部测试 commits：
-
-- `a5c877ad7b0010f8afe99ad9cd5a11f8565c91a6`
-- `c8057f78c69c8582730ae8109ff24d0a1d577970`
-- `c1910dccdd45671aa76087c4239adae2a889aa70`
-
 最终 CI：`34311086872` — **57 test files / 776 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
 
-确认只有 model allowlist 改变：Astra 现在 fail closed，Sol accepted；endpoint、headers、request body 除 model 外、strict schema、parser、timeout、diagnostics、zero retry/fallback 全部保持。
-
 记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-sol-switch-external-verification.md`
+
+### Batch 5B Lave8 background compatibility repair — PASS
+
+首次受控 Sol 真实调用满足 1 accepted localhost / 1 provider start / 0 automatic retry，但 relay 返回 HTTP 400。Safe diagnostics 为 `errorType=invalid_request`、`messageHints=["unsupported","background"]`，提供了足够具体的 evidence。
+
+只批准并实现 Lave8 request body 省略 `background` property；没有改变其他 wire contract。
+
+产品 commit：`5a5a5e634d845eb30a9aee723a31a9b447db0bc0`
+
+最终外部测试 head：`9bb38ee55e03227879ca6b83131f32c083f60d11`
+
+最终 CI：`34315354975` — **57 test files / 776 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+
+记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-background-compatibility-external-verification.md`
 
 ## 当前真实验证门槛
 
 当前批准计划：`docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`
 
-下一次只允许一次新的用户显式真实调用：
+下一次只允许一次新的用户显式真实调用，并且本地源码/编译产物必须包含 `5a5a5e634d845eb30a9aee723a31a9b447db0bc0`：
 
 1. 用户本机安全输入 Lave8 API key；
 2. local service 使用 `BOSS_JOB_RADAR_LAVE8_MODEL=gpt-5.6-sol`，startup 保持 0 relay calls；
-3. 用户在已保存且有完整 JD 的真实 BOSS detail page 打开 Side Panel；
-4. 用户只点击一次 `AI 分析当前岗位`；
-5. 必须同时记录 `analysis_http/request_accepted` count/ordinal 与 `lave8/request_started` count；
-6. one-click 预期 1 accepted localhost request / 1 provider request / 0 automatic retry / 0 fallback；
-7. 成功时 strict validator 通过并只新增一个 `provider=lave8` / `model=gpt-5.6-sol` analysis row；
-8. 成功后导出 sanitized representative sample；
-9. 外部 ChatGPT 完成 grounding、业务可用性与 secret/error/cost safety 验收。
+3. Lave8 request body 必须省略 `background`；
+4. 用户在已保存且有完整 JD 的真实 BOSS detail page 打开 Side Panel；
+5. 用户只点击一次 `AI 分析当前岗位`；
+6. 必须同时记录 `analysis_http/request_accepted` count/ordinal 与 `lave8/request_started` count；
+7. one-click 预期 1 accepted localhost request / 1 provider request / 0 automatic retry / 0 fallback；
+8. 成功时 provider 2xx、`response_accepted`、strict validator 通过，并只新增一个 `provider=lave8` / `model=gpt-5.6-sol` analysis row；
+9. 成功后导出 sanitized representative sample；
+10. 外部 ChatGPT 完成 grounding、业务可用性与 secret/error/cost safety 验收。
 
 真实 sample 通过后，才能考虑：
 
