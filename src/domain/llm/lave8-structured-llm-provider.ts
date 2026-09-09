@@ -3,6 +3,7 @@ import { bindAttemptDiagnostic } from '../../local-service/analysis-attempt-cont
 import type { StructuredLlmProvider, StructuredLlmProviderRequest } from './structured-llm-provider.js';
 import {
   safeLave8RequestParameter, summarizeLave8Error, summarizeLave8Response,
+  safeLave8ContentType, safeLave8BodySize, isLave8SseLike,
   type Lave8RequestParameter, type Lave8StructuredLlmDiagnosticEvent,
 } from './lave8-structured-llm-diagnostics.js';
 
@@ -142,16 +143,39 @@ export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProv
               emitDiagnostic({ scope: 'lave8', event: 'http_non_2xx', status, requestParameter, summary });
               return failed();
             }
+            const contentType = safeLave8ContentType(response);
+            emitDiagnostic({ scope: 'lave8', event: 'response_body_read_started', contentType });
+            let bytes: ArrayBuffer;
+            try {
+              bytes = await response.arrayBuffer();
+            } catch {
+              if (!controller.signal.aborted) {
+                emitDiagnostic({ scope: 'lave8', event: 'response_body_read_failed', contentType });
+              }
+              return failed();
+            }
+            if (controller.signal.aborted) failed();
+            // Match Response.json's UTF-8 decoding (including BOM handling).
+            // The bytes/text stay local; only fixed metadata crosses the diagnostic boundary.
+            const text = new TextDecoder().decode(bytes);
+            emitDiagnostic({ scope: 'lave8', event: 'response_body_received', contentType,
+              bodySize: safeLave8BodySize(bytes.byteLength), sseLike: isLave8SseLike(text) });
+            if (bytes.byteLength === 0) {
+              emitDiagnostic({ scope: 'lave8', event: 'response_body_empty' });
+              return failed();
+            }
             let body: unknown;
             try {
-              body = await response.json();
+              body = JSON.parse(text);
             } catch {
+              // Syntax failure alone cannot establish transport truncation or a proxy timeout.
               if (!controller.signal.aborted) {
                 emitDiagnostic({ scope: 'lave8', event: 'response_json_invalid' });
               }
               return failed();
             }
             if (controller.signal.aborted) failed();
+            emitDiagnostic({ scope: 'lave8', event: 'response_json_parsed' });
             let parsed: unknown;
             try {
               parsed = parseResponse(body);

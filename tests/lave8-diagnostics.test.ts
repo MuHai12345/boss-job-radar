@@ -141,6 +141,9 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
+      { scope: 'lave8', event: 'response_body_read_started', contentType: 'application_json' },
+      { scope: 'lave8', event: 'response_body_received', contentType: 'application_json', bodySize: 'lt_1kb', sseLike: false },
+      { scope: 'lave8', event: 'response_json_parsed' },
       { scope: 'lave8', event: 'response_accepted' },
     ]);
     const serialized = JSON.stringify(events);
@@ -231,6 +234,8 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
+      { scope: 'lave8', event: 'response_body_read_started', contentType: 'text_plain' },
+      { scope: 'lave8', event: 'response_body_received', contentType: 'text_plain', bodySize: 'lt_1kb', sseLike: false },
       { scope: 'lave8', event: 'response_json_invalid' },
     ]);
     expect(JSON.stringify(events)).not.toContain('PRIVATE_RAW_RESPONSE_BODY');
@@ -255,6 +260,9 @@ describe('Lave8 secret-safe transport diagnostics', () => {
     expect(events).toMatchObject([
       { scope: 'lave8', event: 'request_started' },
       { scope: 'lave8', event: 'http_response', status: 200 },
+      { scope: 'lave8', event: 'response_body_read_started', contentType: 'application_json' },
+      { scope: 'lave8', event: 'response_body_received', contentType: 'application_json', bodySize: 'lt_1kb', sseLike: false },
+      { scope: 'lave8', event: 'response_json_parsed' },
       {
         scope: 'lave8', event: 'response_contract_invalid',
         summary: {

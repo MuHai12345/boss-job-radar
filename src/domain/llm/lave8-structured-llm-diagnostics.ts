@@ -64,8 +64,43 @@ export interface Lave8ResponseStructuralSummary {
   readonly outputTextCount: number;
 }
 
+export type Lave8ContentType = 'application_json' | 'text_event_stream' | 'text_plain' | 'text_html' | 'absent' | 'other';
+export type Lave8BodySize = 'empty' | 'lt_1kb' | '1_10kb' | '10_100kb' | '100kb_1mb' | 'gte_1mb';
+
+/** Header values are classification input only, never diagnostic output. */
+export function safeLave8ContentType(response: Response): Lave8ContentType {
+  try {
+    const header = response.headers.get('content-type');
+    if (header === null) return 'absent';
+    switch (header.split(';', 1)[0]?.trim().toLowerCase()) {
+      case 'application/json': return 'application_json';
+      case 'text/event-stream': return 'text_event_stream';
+      case 'text/plain': return 'text_plain';
+      case 'text/html': return 'text_html';
+      default: return 'other';
+    }
+  } catch { return 'other'; }
+}
+
+/** Fetch-exposed bytes (possibly decompressed), not Content-Length/wire bytes. */
+export function safeLave8BodySize(byteLength: number): Lave8BodySize {
+  if (byteLength === 0) return 'empty';
+  if (byteLength < 1024) return 'lt_1kb';
+  if (byteLength < 10 * 1024) return '1_10kb';
+  if (byteLength < 100 * 1024) return '10_100kb';
+  if (byteLength < 1024 * 1024) return '100kb_1mb';
+  return 'gte_1mb';
+}
+
+/** Bounded SSE field-prefix hint only; never an SSE parser or acceptance rule. */
+export function isLave8SseLike(text: string): boolean {
+  return /(?:^|[\r\n])(?:data|event|id|retry):/.test(text.slice(0, 8192));
+}
+
 export type Lave8StructuredLlmDiagnosticEvent = DiagnosticMetadata & { readonly scope: 'lave8' } & (
-  | { readonly event: 'request_started' | 'timeout' | 'network_failure' | 'response_json_invalid' | 'response_accepted' }
+  | { readonly event: 'request_started' | 'timeout' | 'network_failure' | 'response_body_empty' | 'response_json_invalid' | 'response_json_parsed' | 'response_accepted' }
+  | { readonly event: 'response_body_read_started' | 'response_body_read_failed'; readonly contentType: Lave8ContentType }
+  | { readonly event: 'response_body_received'; readonly contentType: Lave8ContentType; readonly bodySize: Lave8BodySize; readonly sseLike: boolean }
   | { readonly event: 'http_response'; readonly status: number }
   | { readonly event: 'http_non_2xx'; readonly status: number; readonly requestParameter: Lave8RequestParameter; readonly summary: Lave8ErrorSummary }
   | { readonly event: 'response_contract_invalid'; readonly summary: Lave8ResponseStructuralSummary }

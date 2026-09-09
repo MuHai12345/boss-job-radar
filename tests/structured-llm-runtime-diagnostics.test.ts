@@ -236,13 +236,42 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     const log = readdirSync(directory).find(name => name.endsWith('.log'))!;
     const records = readFileSync(join(directory, log), 'utf8').trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
     expect(new Set(records.map(event => event.attemptId)).size).toBe(1);
-    expect(records.map(event => event.event ?? event.stage)).toEqual(['created', 'request_accepted', 'request_started', 'http_response', 'response_accepted', ...(valid ? [] : ['output_validation_failed']), 'result']);
+    expect(records.map(event => event.event ?? event.stage)).toEqual(['created', 'request_accepted', 'request_started', 'http_response', 'response_body_read_started', 'response_body_received', 'response_json_parsed', 'response_accepted', ...(valid ? [] : ['output_validation_failed']), 'result']);
     const summaryName = readdirSync(directory).find(name => name.endsWith('.json'))!;
     const summary = JSON.parse(readFileSync(join(directory, summaryName), 'utf8'));
     expect(summary).toMatchObject({ provider: 'lave8', model: 'gpt-5.6-sol', providerTimeoutMs: 90_000, responseAccepted: true,
       ...(valid ? { outcome: 'ok', analysisId: JSON.parse(response.body).id } : { stage: 'output_validation_failed', validationReason: 'unexpected_object_shape' }),
     });
     if (valid) expect(summary).not.toHaveProperty('validationReason');
+  });
+  it.each(['response_body_read_failed', 'response_json_invalid', 'response_body_empty'] as const)('persists %s as providerStage with the same attempt across localhost, Lave8 and runtime', async providerStage => {
+    const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
+    const fetchImpl = vi.fn(async () => {
+      if (providerStage === 'response_body_read_failed') {
+        let pulls = 0;
+        return new Response(new ReadableStream<Uint8Array>({ pull(controller) {
+          if (pulls++ === 0) controller.enqueue(new TextEncoder().encode('{"PRIVATE_PARTIAL":'));
+          else controller.error(new Error('PRIVATE_BODY_READ_FAILURE'));
+        } }), { headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(providerStage === 'response_body_empty' ? '' : '{"PRIVATE_UNFINISHED":', { headers: { 'content-type': 'application/json' } });
+    });
+    const runtime = await start(createLave8StructuredLlmProvider({ apiKey: 'PRIVATE_KEY', modelId: 'gpt-5.6-sol', fetchImpl }), events);
+    seed(runtime);
+    expectGeneric502(await analyze(runtime));
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(events).toMatchObject([{ scope: 'analysis', stage: 'provider_failed' }]);
+    const directory = join(dirname(runtimePaths.get(runtime)!), 'safe-diagnostics');
+    const summaryFile = readdirSync(directory).find(name => name.endsWith('.json'))!;
+    const summary = JSON.parse(readFileSync(join(directory, summaryFile), 'utf8')) as Record<string, unknown>;
+    expect(summary).toMatchObject({ providerStage, responseAccepted: false, diagnosticPersistence: 'ok', outcome: 'analysis_failed', stage: 'provider_failed' });
+    expect(summary).not.toHaveProperty('validationReason');
+    expect(summary).not.toHaveProperty('analysisId');
+    expect(inspect(runtime, database => database.prepare('SELECT COUNT(*) AS count FROM structured_llm_analyses').get())).toEqual({ count: 0 });
+    const records = readFileSync(join(directory, String(summary.diagnosticLog)), 'utf8').trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+    expect(new Set(records.map(event => event.attemptId))).toEqual(new Set([summary.attemptId]));
+    expect(records.filter(event => event.event === providerStage)).toHaveLength(1);
+    expect(records.map(event => event.event)).not.toContain('response_json_parsed');
   });
   it('maps provider failure to provider_failed and preserves the generic 502 contract', async () => {
     const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
