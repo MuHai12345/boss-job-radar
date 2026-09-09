@@ -49,7 +49,9 @@
 - Phase 6 / Batch UX-1：`PASS` — persistent Side Panel + canonical parameterized BOSS URLs + restored explicit link check
 - Phase 6 / Batch 5B diagnostics repair：`PASS` — secret-safe relay/runtime failure-stage diagnostics
 - Phase 6 / Batch 5B pre-retry diagnostics V2：`PASS` — accepted localhost request counting + expanded non-2xx fixed diagnostics
-- Phase 6 / Batch 5B real evaluation：`PENDING` — one new explicit representative Lave8 call
+- Phase 6 / Batch 5B safe message hints：`PASS` — bounded fixed-enum relay message classification + token-aware false-positive repair
+- Phase 6 / Batch 5B Lave8 model switch：`PASS` — production Lave8 structured-analysis model changed from Astra to `gpt-5.6-sol`
+- Phase 6 / Batch 5B real evaluation：`PENDING` — one new explicit representative Lave8 Sol call
 - Phase 6：`IN_PROGRESS`
 
 ## Capability 12 当前覆盖
@@ -75,7 +77,7 @@
 - 正常 BOSS detail query/hash 在浏览器边界 canonicalize，参数不进入 localhost analysis request；
 - Lave8 独立 provider identity；
 - fixed `https://lave8.com/v1/responses`；
-- `gpt-6-astra` explicit allowlist；
+- Lave8 production model explicit allowlist = `gpt-5.6-sol`；`gpt-6-astra` 已从当前 allowlist 移除；
 - Lave8 Bearer secret boundary；
 - strict Responses request/schema/parser；
 - 45 秒 provider timeout；
@@ -93,15 +95,16 @@
 - invalid/unauthenticated/malformed/unconfigured request 不计入 accepted analysis HTTP count；
 - Lave8 non-2xx request parameter allowlist 覆盖 `model`、`reasoning.effort`、`text.format.*` 等实际字段；
 - Lave8 non-2xx error body 只映射固定 structure/type/code categories，不输出 raw provider error；
+- bounded fixed-enum `messageHints`，2048-character inspection cap，token-aware matching，不反射 raw provider message；
 - Side Panel 明确提示手动再次点击属于新的远程分析尝试，可能再次产生 API 费用。
 
-Batch 5B pre-retry diagnostics V2 最终外部工程验证：head `3738ef14df85a66f4dfbbffee3ca6206d207b884`，CI `34219631874`：**56 test files / 769 tests passed**；typecheck、lint、Chrome build、Edge build、local build、manifest verification 全部 PASS。
+Lave8 Sol model switch 最终外部工程验证：product commit `6725198c8fc5103b095ed942311fd0e0b93fc773`，external-test head `c1910dccdd45671aa76087c4239adae2a889aa70`，CI `34311086872`：**57 test files / 776 tests passed**；typecheck、lint、Chrome build、Edge build、local build、manifest verification 全部 PASS。
 
 ## Capability 12 剩余门槛
 
 Capability 12 仍不提前标记 `VERIFIED`。
 
-下一步恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation`：
+下一步恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation`，当前 model 为 `gpt-5.6-sol`：
 
 - 至少 1 个真实已保存 BOSS 岗位，具有完整 JD；
 - 用户主动点击一次 AI 分析；
@@ -111,8 +114,8 @@ Capability 12 仍不提前标记 `VERIFIED`。
 - 无 automatic paid retry；
 - 无 secret/error leakage；
 - 若 accepted HTTP count 与 provider request count 不一致，先定位重复触发层级，不进行额外真实调用；
-- 若 HTTP 400，只有 fixed safe diagnostics 给出明确兼容证据时才批准窄 repair，不盲删参数；
-- 成功后 persisted identity 为 `lave8` / `gpt-6-astra`；
+- 若 HTTP non-2xx，只有 fixed safe diagnostics 给出明确兼容证据时才批准窄 repair，不盲删参数；
+- 成功后 persisted identity 为 `lave8` / `gpt-5.6-sol`；
 - 成功后导出一个 sanitized `real-eval-sample.json`；
 - 外部 ChatGPT 对真实 structured result 完成 grounding 与业务可用性人工验收。
 
@@ -128,7 +131,8 @@ Capability 12 仍不提前标记 `VERIFIED`。
 - `docs/verification/2026-09-08-phase-6-batch-ux-1-external-verification.md`
 - `docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
 - `docs/verification/2026-09-08-phase-6-batch-5b-pre-retry-diagnostics-v2-external-verification.md`
+- `docs/verification/2026-09-09-phase-6-batch-5b-lave8-sol-switch-external-verification.md`
 
 当前真实评测设计：
 
-- `docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
+- `docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`（后续执行时以当前 `gpt-5.6-sol` 产品模型与最新状态记录为准）
