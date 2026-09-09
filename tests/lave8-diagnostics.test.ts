@@ -56,7 +56,7 @@ function create(options: {
 }) {
   return createLave8StructuredLlmProvider({
     apiKey: SECRET,
-    modelId: 'gpt-6-astra',
+    modelId: 'gpt-5.6-sol',
     fetchImpl: options.fetchImpl,
     onDiagnostic: options.onDiagnostic ?? ((event) => options.events?.push(event)),
   });
