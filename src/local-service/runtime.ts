@@ -1,5 +1,9 @@
 import type { StructuredLlmProvider } from '../domain/llm/structured-llm-provider.js';
 import {
+  getStructuredLlmOutputValidationReason,
+  type StructuredLlmOutputValidationReason,
+} from '../domain/llm/structured-llm-analysis-validation.js';
+import {
   openLocalDatabase,
   type LocalDatabase,
 } from './database/database.js';
@@ -21,16 +25,22 @@ export interface LocalRuntime {
   close(): Promise<void>;
 }
 
-export interface StructuredLlmAnalysisDiagnosticEvent {
+export type StructuredLlmAnalysisDiagnosticEvent = {
   readonly scope: 'analysis';
-  readonly stage: 'invalid_source' | 'provider_failed' | 'output_validation_failed'
+  readonly stage: 'invalid_source' | 'provider_failed'
     | 'source_changed' | 'stored_analysis_invalid' | 'internal_or_persistence';
-}
+} | {
+  readonly scope: 'analysis';
+  readonly stage: 'output_validation_failed';
+  readonly validationReason: StructuredLlmOutputValidationReason;
+};
 
 function analysisFailureStage(error: unknown): StructuredLlmAnalysisDiagnosticEvent['stage'] {
+  if (getStructuredLlmOutputValidationReason(error) !== undefined) return 'output_validation_failed';
   try {
     if (error instanceof Error) {
-      switch (error.message) {
+      const message = Object.getOwnPropertyDescriptor(error, 'message');
+      switch (message && 'value' in message ? message.value : undefined) {
         case 'Invalid structured LLM source': return 'invalid_source';
         case 'Structured LLM provider failed': return 'provider_failed';
         case 'Invalid structured LLM analysis output': return 'output_validation_failed';
@@ -68,7 +78,13 @@ export async function startLocalRuntime(options: {
               return { status: 'ok', id: persisted.id };
             } catch (error) {
               try {
-                options.onStructuredLlmDiagnostic?.({ scope: 'analysis', stage: analysisFailureStage(error) });
+                const stage = analysisFailureStage(error);
+                options.onStructuredLlmDiagnostic?.(stage === 'output_validation_failed'
+                  ? {
+                      scope: 'analysis', stage,
+                      validationReason: getStructuredLlmOutputValidationReason(error) ?? 'other_validation_failure',
+                    }
+                  : { scope: 'analysis', stage });
               } catch {
                 // Preserve the original exception even if the observer fails.
               }
