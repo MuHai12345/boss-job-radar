@@ -167,7 +167,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
     ['failed', { ...completedResponse({ ok: true }) as Record<string, unknown>, status: 'failed', error: { message: 'PRIVATE_UPSTREAM_ERROR' } }],
     ['queued', { ...completedResponse({ ok: true }) as Record<string, unknown>, status: 'queued' }],
     ['tool output', { ...completedResponse({ ok: true }) as Record<string, unknown>, output: [{ type: 'function_call', name: 'x' }] }],
-    ['chat completions shape', { id: 'chatcmpl_test', choices: [{ message: { role: 'assistant', content: '{\"ok\":true}' } }] }],
+    ['chat completions shape', { id: 'chatcmpl_test', choices: [{ message: { role: 'assistant', content: '{"ok":true}' } }] }],
     ['refusal', {
       ...completedResponse({ ok: true }) as Record<string, unknown>,
       output: [{
