@@ -201,7 +201,7 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
     expect(events).toEqual([{ scope: 'analysis', stage: 'provider_failed' }]);
   });
 
-  it('maps structured output rejection to output_validation_failed without exposing output', async () => {
+  it('maps structured output rejection to a fixed validation reason without exposing output', async () => {
     const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
     const provider = fakeProvider({ output: { roleSummary: 'PRIVATE_INVALID_OUTPUT' } });
     const runtime = await start(provider, events);
@@ -209,8 +209,63 @@ describe('structured LLM runtime fixed failure-stage diagnostics', () => {
 
     expectGeneric502(await analyze(runtime));
     expect(provider.calls).toBe(1);
-    expect(events).toEqual([{ scope: 'analysis', stage: 'output_validation_failed' }]);
+    expect(events).toEqual([{
+      scope: 'analysis',
+      stage: 'output_validation_failed',
+      validationReason: 'unexpected_object_shape',
+    }]);
     expect(JSON.stringify(events)).not.toContain('PRIVATE_INVALID_OUTPUT');
+    expect(JSON.stringify(events)).not.toContain(JD);
+  });
+
+  it('reports exact-JD grounding failure by fixed enum only', async () => {
+    const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
+    const output = validOutput();
+    const provider = fakeProvider({
+      output: {
+        ...output,
+        responsibilityFindings: [{
+          ...output.responsibilityFindings[0],
+          evidence: [{ source: 'full_jd', excerpt: 'PRIVATE_PARAPHRASED_EXCERPT' }],
+        }],
+      },
+    });
+    const runtime = await start(provider, events);
+    seed(runtime);
+
+    expectGeneric502(await analyze(runtime));
+    expect(provider.calls).toBe(1);
+    expect(events).toEqual([{
+      scope: 'analysis',
+      stage: 'output_validation_failed',
+      validationReason: 'full_jd_excerpt_not_exact',
+    }]);
+    expect(JSON.stringify(events)).not.toContain('PRIVATE_PARAPHRASED_EXCERPT');
+  });
+
+  it('reports disallowed structured evidence code by fixed enum only', async () => {
+    const events: StructuredLlmAnalysisDiagnosticEvent[] = [];
+    const output = validOutput();
+    const provider = fakeProvider({
+      output: {
+        ...output,
+        riskInterpretation: {
+          ...output.riskInterpretation,
+          concerns: [{ source: 'opportunity', code: 'PRIVATE_INVENTED_CODE' }],
+        },
+      },
+    });
+    const runtime = await start(provider, events);
+    seed(runtime);
+
+    expectGeneric502(await analyze(runtime));
+    expect(provider.calls).toBe(1);
+    expect(events).toEqual([{
+      scope: 'analysis',
+      stage: 'output_validation_failed',
+      validationReason: 'structured_evidence_code_not_allowed',
+    }]);
+    expect(JSON.stringify(events)).not.toContain('PRIVATE_INVENTED_CODE');
   });
 
   it('maps a corrupted authoritative source to invalid_source before any provider call', async () => {
