@@ -1,6 +1,6 @@
 # ADR-0021：Representative Real Lave8 Sol Evaluation v2
 
-- 状态：APPROVED FOR ONE REPRESENTATIVE REAL EVALUATION
+- 状态：APPROVED FOR ONE REPRESENTATIVE REAL EVALUATION AFTER BACKGROUND REPAIR
 - 日期：2026-09-09
 - 对应能力：Capability 12 — structured LLM analysis
 - 当前 provider：`lave8`
@@ -14,23 +14,54 @@
 
 用户随后决定停止继续适配 Astra，并将 Lave8 structured analysis 的生产模型直接切换为 `gpt-5.6-sol`。
 
-产品 switch commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`。
+Sol switch 产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`。
 
-外部测试 head：`c1910dccdd45671aa76087c4239adae2a889aa70`。
+Sol switch 外部测试 head：`c1910dccdd45671aa76087c4239adae2a889aa70`。
 
-最终工程 CI：`34311086872` — **57 test files / 776 tests passed**，typecheck、lint、Chrome、Edge、local-service、manifest verification 全部 PASS。
+Sol switch 最终工程 CI：`34311086872` — **57 test files / 776 tests passed**，typecheck、lint、Chrome、Edge、local-service、manifest verification 全部 PASS。
 
-正式验证记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-sol-switch-external-verification.md`。
+正式记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-sol-switch-external-verification.md`。
 
-## Wire contract
+## 首次 Sol 真实评测与 evidence-driven repair
 
-切换到 Sol 后只允许 model 字段变化。继续固定：
+在切换 Sol 后的一次受控真实调用中，用户只点击一次 AI 分析。safe diagnostics 明确显示：
+
+- `analysis_http/request_accepted = 1`；
+- `lave8/request_started = 1`；
+- HTTP `400`；
+- `errorType=invalid_request`；
+- `messageHints=["unsupported","background"]`；
+- runtime `provider_failed`；
+- 同 ordinal `analysis_http/result=analysis_failed`。
+
+因此该次调用的 one-click cost boundary 为 **1 / 1**，没有 automatic retry 或 duplicate provider start。
+
+与此前 unknown/other 不同，这次 fixed-safe message hints 已经给出足够具体的 compatibility evidence，批准只省略 Lave8 request body 的 `background` property。
+
+Background repair 产品 commit：
+
+`5a5a5e634d845eb30a9aee723a31a9b447db0bc0`
+
+外部测试最终 head：
+
+`9bb38ee55e03227879ca6b83131f32c083f60d11`
+
+最终工程 CI：
+
+`34315354975` — **57 test files / 776 tests passed**，typecheck、lint、Chrome、Edge、local-service、manifest verification 全部 PASS。
+
+正式记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-background-compatibility-external-verification.md`。
+
+## 当前 Wire contract
+
+下一次 Sol 真实评测固定使用：
 
 - POST `https://lave8.com/v1/responses`
 - Bearer auth
 - `Content-Type: application/json`
+- model `gpt-5.6-sol`
 - `store:false`
-- `background:false`
+- **省略 `background` property**
 - `stream:false`
 - `reasoning:{effort:"low"}`
 - `max_output_tokens:4000`
@@ -43,12 +74,15 @@
 
 不加入：
 
+- `background:true/null/undefined`
 - `x-openai-internal-codex-responses-lite`
 - `reasoning.context`
 - `additional_tools`
 - Codex client/thread/session/install metadata
 - model fallback
 - protocol fallback
+
+除已证据化的 `background` omission 外，不再做 speculative wire changes。
 
 ## 用户参与边界
 
@@ -121,6 +155,8 @@ API key 只允许在本机启动器 / local-service process 生命周期内存�
 - fixed runtime analysis stage。
 
 不输出 raw provider body/message、prompt/JD、key、Authorization、stack、database path 或身份元数据。
+
+若再次 HTTP non-2xx，只有 safe diagnostics 给出同等级别的明确 evidence 时才批准下一项窄 compatibility repair；不得一次删多个参数、不得做 blind protocol/model fallback。
 
 ## Capability gate
 
