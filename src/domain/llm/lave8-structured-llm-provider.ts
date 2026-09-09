@@ -9,7 +9,7 @@ export type { Lave8StructuredLlmDiagnosticEvent } from './lave8-structured-llm-d
 
 export const LAVE8_STRUCTURED_LLM_TIMEOUT_MS = 45_000;
 export const LAVE8_STRUCTURED_LLM_ENDPOINT = 'https://lave8.com/v1/responses';
-export const LAVE8_STRUCTURED_LLM_MODEL_IDS = Object.freeze(['gpt-6-astra'] as const);
+export const LAVE8_STRUCTURED_LLM_MODEL_IDS = Object.freeze(['gpt-5.6-sol'] as const);
 
 export interface Lave8StructuredLlmProviderOptions {
   readonly apiKey: string;
