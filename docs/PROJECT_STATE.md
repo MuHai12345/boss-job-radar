@@ -5,22 +5,20 @@
 - 仓库：`MuHai12345/boss-job-radar`
 - 分支：`master`
 - Phase 0–5：`PASS`
-- Phase 6：`IN PROGRESS`
-- 最近完成批次：`Phase 6 / Batch 5B pre-retry diagnostics V2 — PASS`
+- Phase 6：`IN_PROGRESS`
+- 最近完成批次：`Phase 6 / Batch 5B — Lave8 GPT-5.6 Sol production model switch — PASS`
 - 当前能力：Capability 12 — structured LLM analysis：`IN_PROGRESS`
-- 下一步：恢复 `Phase 6 / Batch 5B — representative real Lave8 evaluation`，只允许一次新的用户显式真实调用
+- 核心能力矩阵：`12 / 15 VERIFIED`
 - Lave8 provider：`lave8`
 - Lave8 endpoint：`https://lave8.com/v1/responses`
-- Lave8 approved model：`gpt-6-astra`
-- Batch 5A adapter repair：`6e858316ecfefb6e9c3552646cb3db7a437c93bd`
-- Batch UX-1 Side Panel：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8` + repair `a270abd90363807f5139b0f698ec7c55a5457c27`
-- Batch 5B diagnostics 产品实现：`2697dc232716e50fb60722820716efb540eb21d4`
-- Batch 5B pre-retry diagnostics V2 产品实现：`0a0c357569947fe8c03aa1570344a4656df7f15a`
-- Batch 5B pre-retry diagnostics V2 最终外部测试 head：`3738ef14df85a66f4dfbbffee3ca6206d207b884`
-- Batch 5B pre-retry diagnostics V2 最终 CI：`34219631874` — **56 test files / 769 tests passed**
-- 核心能力矩阵：`12 / 15 VERIFIED`，Capability 12 `IN_PROGRESS`
-- 当前产品实现阻塞：无；真实 relay 兼容性仍未通过
-- 当前验证门槛：至少 1 个真实 Lave8 browser → localhost → relay → strict validation → SQLite sample + 外部人工 grounding/业务可用性验收；下一次真实评测必须同时比较 `analysis_http/request_accepted` 与 `lave8/request_started` 数量
+- Lave8 当前唯一批准 model：`gpt-5.6-sol`
+- `gpt-6-astra`：已退出当前产品 allowlist；不再继续做 Responses Lite 适配
+- Sol switch 产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`
+- Sol switch 最终外部测试 head：`c1910dccdd45671aa76087c4239adae2a889aa70`
+- Sol switch 最终工程 CI：`34311086872` — **57 test files / 776 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS
+- 当前产品实现阻塞：无
+- 当前验证阻塞：尚无真实 `gpt-5.6-sol` representative browser → localhost → relay → strict validator → SQLite sample
+- 下一步：按 `docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md` 只做一次新的用户显式 Sol 真实分析
 
 ## 已验证核心能力
 
@@ -39,223 +37,170 @@
 
 尚未整体验证：Capability 12–14。
 
-Capability 12 的产品实现链路已经连续完成并外部验收：provider-neutral foundation、OpenAI Responses transport、本地 opt-in config、protected localhost explicit trigger、browser explicit user trigger、独立 Lave8 relay adapter、persistent Side Panel、secret-safe Lave8/runtime diagnostics，以及真实评测请求数量与 non-2xx 固定类别诊断。整体仍为 `IN_PROGRESS`，因为真实 Lave8 Responses/Structured Outputs 兼容性与 representative model output 尚未完成 end-to-end 验收。
+## Capability 12 已完成产品链路
 
-## Phase 6 / Batch 1 — PASS
+Capability 12 已通过外部工程验证的部分包括：
 
-建立并验证：
+- provider-neutral structured LLM foundation；
+- minimized snapshot + 完整 JD / authoritative upstream evidence；
+- prompt injection / delimiter boundary；
+- strict structured output schema + product validator；
+- full-JD substring / upstream-code grounding；
+- schema v8 persistence、provider/model/source-state identity、same-state idempotency；
+- source-change race rejection、provider call outside SQLite transaction；
+- official OpenAI Responses transport；
+- local opt-in config、startup secret sanitization；
+- protected localhost explicit analysis trigger；
+- explicit browser user trigger、50 秒 browser deadline、zero automatic retry；
+- persistent Side Panel；
+- canonical BOSS detail URL handling；
+- 独立 Lave8 provider + fixed relay endpoint；
+- Bearer secret boundary；
+- strict Responses request/schema/parser；
+- 45 秒 provider timeout、zero retry / zero fallback / max one fetch；
+- secret-safe relay/runtime diagnostics；
+- accepted localhost analysis ordinal + fixed result diagnostics；
+- fixed non-2xx request parameter / error structure / error type / error code categories；
+- bounded token-aware fixed-enum `messageHints`，不反射 raw provider error；
+- Side Panel 明确提示手动再次点击属于新远程尝试并可能产生新 API 费用；
+- 当前 Lave8 production model allowlist 已切换并外部验证为仅 `gpt-5.6-sol`。
 
-- `StructuredLlmProvider` 抽象；
-- 最小化 input snapshot；
-- 完整 JD + authoritative upstream structured facts 输入边界；
-- prompt injection / delimiter 防线；
-- strict structured output validator；
-- full-JD substring / upstream evidence grounding；
-- schema v8 `structured_llm_analyses`；
-- provider/model/source-state append-only history；
-- same-state idempotency；
-- provider call outside SQLite transaction；
-- source-change race rejection；
-- missing complete JD 时 0 provider calls。
+Capability 12 仍为 `IN_PROGRESS`，因为缺少 Sol 的真实 end-to-end representative sample 与外部 grounding / business-usability 验收。
 
-正式记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
+## Phase 6 批次记录
 
-## Phase 6 / Batch 2 — PASS
+### Batch 1 — PASS
 
-Codex 产品实现：`34aaa1b1d23fb5f7b729f006436ed4816f381dd3`
+Provider-neutral structured LLM foundation、严格验证、grounding、schema v8 persistence 与 source-state/idempotency 边界。
 
-验证：
+记录：`docs/verification/2026-09-07-phase-6-batch-1-external-verification.md`
 
-- OpenAI Responses concrete provider；
-- explicit approved model allowlist；
-- API key constructor-only secret boundary；
-- fixed official Responses endpoint；
-- system/user prompt separation；
-- strict Structured Outputs JSON Schema；
-- completed-only output parser；
-- refusal/incomplete/failed/malformed/non-2xx fail closed；
-- 45 秒 timeout；
-- zero retry / zero fallback。
+### Batch 2 — PASS
 
-最终：**49 test files / 697 tests passed**，typecheck/lint/build/manifests 全部 PASS。
+Official OpenAI Responses provider、fixed endpoint、approved model allowlist、strict Structured Outputs、completed-only parser、45 秒 timeout、zero retry/fallback。
 
-正式记录：`docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
+记录：`docs/verification/2026-09-07-phase-6-batch-2-external-verification.md`
 
-## Phase 6 / Batch 3 — PASS
+### Batch 3 — PASS
 
-Codex 产品实现：`95ecbed47598378cb402a89757bf17d9e8327c64`
+Local key/model config、secret sanitization、protected `POST /structured-llm-analyses`、explicit trigger 与 0 unintended provider-call boundary。
 
-验证：
+记录：`docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
 
-- product-specific local key/model config；
-- disabled-by-default / partial-invalid fail closed；
-- startup secret sanitization；
-- runtime optional provider；
-- protected `POST /structured-llm-analyses`；
-- exact canonical `jobUrl` request；
-- loopback Host / extension Origin / bridge token / media type / encoding / body limit；
-- id-only success；
-- generic error hygiene；
-- startup/import/link/status/opportunity/health/session 0 provider calls；
-- same-state explicit-trigger idempotency。
+### Batch 4 — PASS
 
-最终：**50 test files / 714 tests passed**。
+Browser localhost client、explicit click、remote-data/API-cost disclosure、fresh bridge session、canonical request、zero automatic retry。
 
-正式记录：`docs/verification/2026-09-07-phase-6-batch-3-external-verification.md`
+记录：`docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
 
-## Phase 6 / Batch 4 — PASS
+### Batch 5A — PASS
 
-Codex 产品实现：`9959cbf9a372509207ce3c78e29a800be6d39f03`
+首次加入独立 Lave8 relay adapter。该批历史批准 model 为 `gpt-6-astra`；这是历史记录，不代表当前 model。Endpoint 固定为 `https://lave8.com/v1/responses`，并保持 strict Responses / 45 秒 / zero retry/fallback。
 
-验证：
+记录：`docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
 
-- structured LLM browser localhost client；
-- fresh bridge session per action；
-- browser body 只有 `jobUrl`；
-- browser 不接触 API key/model/full JD；
-- 50 秒 browser deadline；
-- zero automatic retry；
-- strict HTTP success/failure mapping；
-- explicit user trigger；
-- remote-data/API-cost disclosure；
-- initialization 0 analysis calls；
-- click-time active-tab revalidation；
-- in-flight duplicate guard；
-- fresh-final-tab fail closed restore。
+### Batch UX-1 — PASS
 
-最终：**52 test files / 762 tests passed**；Batch 4 专项 **48 / 48 passed**。
+主体验迁移到 persistent Side Panel；正常带 query/hash 的 BOSS detail URL 可 canonicalize；explicit link check 恢复。
 
-正式记录：`docs/verification/2026-09-08-phase-6-batch-4-external-verification.md`
+产品：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8` + repair `a270abd90363807f5139b0f698ec7c55a5457c27`。
 
-## Phase 6 / Batch 5A — PASS
+记录：`docs/verification/2026-09-08-phase-6-batch-ux-1-external-verification.md`
 
-用户明确选择第三方 Lave8 relay，而不是官方 OpenAI endpoint。
+### Batch 5B diagnostics repair — PASS
 
-Codex 原始实现：`cf384babda624719952b5d49a47dbfc63f6e9371`
+加入 secret-safe Lave8 transport/runtime failure-stage diagnostics，同时保持 browser/server generic failure、zero retry/fallback 与 max-one-fetch。
 
-验证：
+产品：`2697dc232716e50fb60722820716efb540eb21d4`
 
-- 独立 `providerId = 'lave8'`；
-- fixed `https://lave8.com/v1/responses`；
-- only approved model `gpt-6-astra`；
-- Bearer key 只进入 Authorization；
-- 严格复用 Responses request/schema/parser contract；
-- 45 秒 bounded timeout；
-- zero retry / zero request-shape/model/endpoint fallback；
-- `BOSS_JOB_RADAR_LAVE8_API_KEY` / `BOSS_JOB_RADAR_LAVE8_MODEL`；
-- OpenAI 与 Lave8 不能同时配置；
-- provider-neutral remote-data/API-cost disclosure。
+最终 CI：`34215510564` — **54 test files / 762 tests passed**。
 
-首轮实现改变了既有 OpenAI runtime-config observable shape；窄修复 `6e858316ecfefb6e9c3552646cb3db7a437c93bd` 恢复兼容。
+记录：`docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
 
-最终 CI：`34201735884` — **54 test files / 781 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+### Batch 5B pre-retry diagnostics V2 — PASS
 
-正式记录：`docs/verification/2026-09-08-phase-6-batch-5a-external-verification.md`
+加入 `analysis_http/request_accepted` process-local ordinal 与 fixed result，扩展 non-2xx fixed-safe diagnostics，从而可以区分 browser/local duplicate 与 provider-chain duplicate。
 
-## Phase 6 / Batch UX-1 — PASS
+产品：`0a0c357569947fe8c03aa1570344a4656df7f15a`
 
-为避免 popup 因网页误触关闭导致工作上下文丢失，主扩展体验迁移到 persistent browser Side Panel；popup 降级为轻量 launcher。
+最终外部测试 head：`3738ef14df85a66f4dfbbffee3ca6206d207b884`
 
-已验证：
+最终 CI：`34219631874` — **56 test files / 769 tests passed**。
 
-- Side Panel 点击网页其他区域不消失；
-- `browser.storage.local` 只保留最小展示快照；
-- unsupported page 切换不清空上次结果；
-- BOSS 正常带 query/hash 的详情 URL 可 canonicalize 后用于 AI；
-- query/hash、`securityId`、`ka` 不进入 localhost analysis request / UI snapshot；
-- 已 VERIFIED 的显式岗位链接状态检查入口恢复；
-- link check 不自动触发；
-- Chrome / Edge MV3 side panel build 与新权限基线通过。
+记录：`docs/verification/2026-09-08-phase-6-batch-5b-pre-retry-diagnostics-v2-external-verification.md`
 
-产品实现：`2a994fcc5f86f8cde2518a5a7c5eb46c205ca5a8`；窄修复：`a270abd90363807f5139b0f698ec7c55a5457c27`。
+### Batch 5B safe message hints — PASS
 
-正式记录：`docs/verification/2026-09-08-phase-6-batch-ux-1-external-verification.md`
+真实 Astra HTTP 400 的 fixed safe categories 仍不足以定位 relay 错误，因此加入 bounded fixed-enum `messageHints`；随后修复 `upstream→stream`、`restored→store`、`modeling→model` 等 substring false positives，改为 token-aware matching。
 
-## Phase 6 / Batch 5B diagnostics repair — PASS
+最终产品 repair：`7f1c4a726f530c1ab3658bcc63cb6eadf508390f`
 
-首次真实 Lave8 评测得到 generic `502 analysis_failed` 且无新持久化结果；该证据不足以判断是 key、relay、response contract、structured output、source state 或 persistence 问题，因此未做推测，也未自动重试。
+最终工程基线：**57 test files / 776 tests passed**。
 
-产品诊断实现：`2697dc232716e50fb60722820716efb540eb21d4`。
+### Batch 5B Responses Lite research — RESEARCH COMPLETE
 
-外部验证确认：
+用户提供的 model metadata 把 Astra 标为 `use_responses_lite=true`，Sol 标为 false。对 OpenAI Codex / Sub2API 公开源码研究确认 Responses Lite 确有 header/request-construction 差异，但无法证明 Lave8 当前 Astra 路由要求客户端主动复制 Codex Lite contract。
 
-- Lave8 transport 固定安全事件：request / HTTP status / timeout / network / non-2xx / invalid JSON / response-contract summary / accepted；
-- non-2xx 只允许一次诊断性 JSON read，并把 `error.param` 映射到固定 allowlist；
-- response structural summary 只含固定 enums 与 bounded counts；
-- 不输出 raw provider body、raw error、prompt、JD、key、Authorization、IDs/metadata；
-- runtime 只输出固定 `invalid_source` / `provider_failed` / `output_validation_failed` / `source_changed` / `stored_analysis_invalid` / `internal_or_persistence` stage；
-- observer/callback 自身失败不改变 provider/HTTP 结果；
-- browser/server 继续 generic `502 analysis_failed`；
-- zero retry / zero fallback / max one fetch 保持；
-- startup/import/link/status/opportunity/health 仍为 0 provider calls。
+Evidence classification：`B — RESPONSES_LITE_COMPATIBILITY_IS_WEAK_LEAD`。
 
-最终外部 CI：`34215510564`，head `5880db94242849b5cc610d15e4e59cc8f5e45fd4`：**54 test files / 762 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+因此没有向产品加入 `x-openai-internal-codex-responses-lite`、Codex metadata、additional_tools、reasoning.context 或 streaming 适配。
 
-正式记录：`docs/verification/2026-09-08-phase-6-batch-5b-diagnostics-external-verification.md`
+### Batch 5B Lave8 GPT-5.6 Sol switch — PASS
 
-## Phase 6 / Batch 5B pre-retry diagnostics V2 — PASS
+用户决定停止继续适配 Astra，直接将 Lave8 production structured-analysis model 切到 `gpt-5.6-sol`。
 
-后续真实评测在单次授权窗口中观察到 **3 个 `lave8/request_started`**，但当时无法确认究竟有多少个 localhost analysis request 通过了安全边界；与此同时首次 provider response 为 HTTP 400，但 `requestParameter=unknown`，因此仍不允许把三次请求断言为自动 retry，也不允许根据 400 盲删请求参数。
+产品 commit：`6725198c8fc5103b095ed942311fd0e0b93fc773`
 
-Codex 产品实现：`0a0c357569947fe8c03aa1570344a4656df7f15a`。
+外部测试 commits：
 
-外部验证确认：
+- `a5c877ad7b0010f8afe99ad9cd5a11f8565c91a6`
+- `c8057f78c69c8582730ae8109ff24d0a1d577970`
+- `c1910dccdd45671aa76087c4239adae2a889aa70`
 
-- `/structured-llm-analyses` 在完整验证通过且即将调用 writer 前 emit `analysis_http/request_accepted`；
-- 每个 accepted request 分配 process-local positive ordinal，完成后以同 ordinal emit固定 `result` outcome；
-- invalid、unauthenticated、malformed、unconfigured request 不会 emit accepted；
-- analysis HTTP diagnostic 不含 URL/body/token/headers/prompt/JD/error/DB detail；
-- Lave8 safe `requestParameter` 扩展覆盖 `model`、`reasoning.effort`、`text.format.*` 等实际发送字段；
-- non-2xx 只输出固定 body-structure / error-type / error-code categories；
-- raw provider message/type/code/param/body 仍不输出；
-- Side Panel 失败提示明确手动再点属于新的分析尝试，可能再次产生远程请求/API 费用；
-- request shape、endpoint、model、timeout、zero retry/fallback 均未改变。
+最终 CI：`34311086872` — **57 test files / 776 tests passed**；typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
 
-原产品 commit 的首次 CI `34219279131` 因旧 test type baseline 未包含新增 callback 而在 typecheck 失败；外部 ChatGPT 更新测试基线并新增诊断测试后，最终 head `3738ef14df85a66f4dfbbffee3ca6206d207b884`、CI `34219631874`：**56 test files / 769 tests passed**，typecheck/lint/Chrome/Edge/local/manifests 全部 PASS。
+确认只有 model allowlist 改变：Astra 现在 fail closed，Sol accepted；endpoint、headers、request body 除 model 外、strict schema、parser、timeout、diagnostics、zero retry/fallback 全部保持。
 
-正式记录：`docs/verification/2026-09-08-phase-6-batch-5b-pre-retry-diagnostics-v2-external-verification.md`
+记录：`docs/verification/2026-09-09-phase-6-batch-5b-lave8-sol-switch-external-verification.md`
 
-## Phase 6 / Batch 5B — 当前真实验证门槛
+## 当前真实验证门槛
 
-批准计划：`docs/decisions/ADR-0020-representative-real-lave8-evaluation-v1.md`
+当前批准计划：`docs/decisions/ADR-0021-representative-real-lave8-sol-evaluation-v2.md`
 
-Batch 5B 继续是**验证批，不是产品编码批**。下一次只允许一次新的用户显式真实调用：
+下一次只允许一次新的用户显式真实调用：
 
 1. 用户本机安全输入 Lave8 API key；
-2. local service 使用 `gpt-6-astra`，startup 仍为 0 relay calls；
-3. 用户在已保存且具有完整 JD 的真实 BOSS job detail page 主动点击一次 AI 分析；正常 query/hash URL 已支持；
-4. 必须同时记录 `analysis_http/request_accepted` count/ordinals 和 `lave8/request_started` count；
-5. 一个 click 预期最多一个 accepted localhost analysis request、最多一个 relay provider request、0 automatic retries；
-6. 若 accepted localhost count > 1，先调查 browser/Side Panel 重复触发；若 accepted count = 1 但 provider request_started > 1，先调查 localhost/repository/provider 链路；不得自动重试；
-7. 若出现 HTTP 400，只依据 fixed safe `requestParameter` / error category 决定是否已有明确 relay compatibility evidence，没有证据则不盲改；
-8. 成功时至少一个 result 通过 strict validator 并持久化为 `provider=lave8` / `model=gpt-6-astra`；
-9. 成功后生成只包含所选 analysis 的 sanitized `real-eval-sample.json`；
-10. 外部 ChatGPT 完成 grounding、业务可用性、secret/error/cost safety 人工验收。
+2. local service 使用 `BOSS_JOB_RADAR_LAVE8_MODEL=gpt-5.6-sol`，startup 保持 0 relay calls；
+3. 用户在已保存且有完整 JD 的真实 BOSS detail page 打开 Side Panel；
+4. 用户只点击一次 `AI 分析当前岗位`；
+5. 必须同时记录 `analysis_http/request_accepted` count/ordinal 与 `lave8/request_started` count；
+6. one-click 预期 1 accepted localhost request / 1 provider request / 0 automatic retry / 0 fallback；
+7. 成功时 strict validator 通过并只新增一个 `provider=lave8` / `model=gpt-5.6-sol` analysis row；
+8. 成功后导出 sanitized representative sample；
+9. 外部 ChatGPT 完成 grounding、业务可用性与 secret/error/cost safety 验收。
 
-用户不是 CMD 测试执行器。本批允许 Codex 在不修改产品源码的前提下临时接管本机 Git/build/local-service/SQLite/安全日志/导出工作。用户只保留 secure local key entry、必要的 extension Reload，以及最终一次显式分析点击。
-
-只有真实 provider 评测通过后，才能考虑：
+真实 sample 通过后，才能考虑：
 
 - Capability 12 → `VERIFIED`
 - Phase 6 → `PASS`
-- 进入 Phase 7 / Capability 13
+- 核心能力 → `13 / 15 VERIFIED`
 
 ## 已确认但尚未修复的 Side Panel UX 问题
 
-真实评测期间还确认了两个独立 UX 缺口，它们不与当前 Lave8 兼容性修复混批：
+这两项继续与当前 Lave8 real-eval gate 分开处理：
 
-- 搜索结果页列表薪资可能携带依赖网页字体的 PUA 字符；当前 Side Panel 直接显示 extraction `salaryText`，尚未消费已经 VERIFIED 的可信 salary decoding result，也没有在不可可信解码时显示明确未知状态。
-- persistent Side Panel 跨新标签页保留，但 manifest 当前使用 `activeTab` 且没有 BOSS 持续 host permission；新 tab 不继承旧 tab 的临时授权，导致用户可能需要重新点击工具栏扩展才能注入解析。后续应单独设计最小权限 UX，不扩大到 `<all_urls>`。
+- 搜索结果页薪资可能包含网页字体 PUA 字符；当前 Side Panel 尚未消费已经 VERIFIED 的可信 salary decoding result。后续 UI 应优先显示 trusted decoded/plain salary；未可信解码时显示“薪资待解码/未知”，不能把方框乱码当可信工资。
+- persistent Side Panel 跨新标签页保留，但当前 manifest 使用 `activeTab` 且没有 BOSS 持续 host permission；新 tab 不继承旧 tab 的临时授权。后续单独设计 BOSS-only 最小 optional host permission，不扩大到 `<all_urls>`。
 
 ## 协作与测试规则
 
 长期分工以 `AGENTS.md` 为准：
 
-- Codex：只负责外部 Prompt 指定的产品源码、必要 migration、commit、push。
-- Codex 默认不新增或修改测试，不运行测试/typecheck/lint/build/manifest verification，不做 QA 或验收。
-- 外部网页版 ChatGPT：负责全部测试代码、CI、代码审阅、验证、验收和状态文档。
+- Codex：负责外部 Prompt 指定的产品源码、必要 migration、commit、push。
+- Codex 默认不修改 tests/docs，不承担完整 CI/QA/最终验收。
+- 外部网页版 ChatGPT：负责测试代码、CI、代码审阅、验证、验收和状态文档。
 - 用户不是 CMD 测试执行器；仅在真实登录 BOSS 浏览器或真实 provider 场景执行不可替代的最少量人工动作。
-- Batch 5B 的本机验证环境操作是一次明确例外，不改变长期角色分工。
+- Batch 5B 本机验证环境操作是一次明确例外，不改变长期角色分工。
 
 ## 长期产品边界
 
