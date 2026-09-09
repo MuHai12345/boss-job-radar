@@ -222,7 +222,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
     expect(calls).toBe(1);
   });
 
-  it('aborts at the fixed 45 second deadline with one request and no fallback', async () => {
+  it('aborts at the fixed 90 second deadline with one request and no fallback', async () => {
     vi.useFakeTimers();
     let calls = 0;
     let signal: AbortSignal | undefined;
@@ -234,7 +234,7 @@ describe('Lave8 Responses fail-closed behavior', () => {
 
     const pending = provider(fetchImpl).generate(REQUEST);
     const rejected = expect(pending).rejects.toThrow('Structured LLM provider failed');
-    expect(LAVE8_STRUCTURED_LLM_TIMEOUT_MS).toBe(45_000);
+    expect(LAVE8_STRUCTURED_LLM_TIMEOUT_MS).toBe(90_000);
     expect(calls).toBe(1);
     expect(signal?.aborted).toBe(false);
 
