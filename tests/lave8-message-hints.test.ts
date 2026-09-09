@@ -85,6 +85,12 @@ describe('Lave8 safe error message hints', () => {
     expect(hints('An upstream relay restored prior modeling metadata.')).toEqual(['other']);
   });
 
+  it('requires genuine parameter tokens for compound model and endpoint hints', () => {
+    expect(hints('Modeling metadata was not found.')).toEqual(['other']);
+    expect(hints('Modeling metadata is not supported.')).toEqual(['unsupported']);
+    expect(hints('Endpointing metadata is unavailable.')).toEqual(['other']);
+  });
+
   it('deduplicates and bounds emitted hints to at most 16 fixed values', () => {
     const result = hints([
       'model not found unsupported api key permission forbidden rate limit quota',
