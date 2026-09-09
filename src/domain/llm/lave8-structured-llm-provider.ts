@@ -98,7 +98,7 @@ export function createLave8StructuredLlmProvider(options: Lave8StructuredLlmProv
               },
               signal: controller.signal,
               body: JSON.stringify({
-                model: modelId, store: false, background: false, stream: false,
+                model: modelId, store: false, stream: false,
                 reasoning: { effort: 'low' }, max_output_tokens: 4000,
                 input: [
                   { role: 'system', content: [{ type: 'input_text', text: request.systemPrompt }] },
