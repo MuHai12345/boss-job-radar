@@ -9,31 +9,38 @@ const REQUEST_PARAMETERS = [
 
 export type Lave8RequestParameter = typeof REQUEST_PARAMETERS[number];
 
+/** Local patterns only; punctuation (including _, . and /) separates English tokens. */
+function messageHintPattern(...patterns: RegExp[]): RegExp {
+  return new RegExp(`^${patterns.map((pattern) =>
+    `(?=.*(?:^|[^a-z0-9])(?:${pattern.source})(?=$|[^a-z0-9]))`,
+  ).join('')}`);
+}
+
 // Each hint appears once; this local order also determines truncation priority.
 const ERROR_MESSAGE_HINT_RULES = [
-  ['model', /model/],
-  ['model_not_found', /(?=.*model)(?=.*(?:not found|does not exist|unknown model))/],
-  ['model_unsupported', /(?=.*model)(?=.*(?:unsupported|not supported))/],
-  ['authentication', /api key|authentication|unauthorized/],
-  ['permission', /permission|forbidden/],
-  ['rate_limit', /rate limit/],
-  ['quota', /quota/],
-  ['unsupported', /unsupported|not supported/],
-  ['unknown_parameter', /unknown parameter|unrecognized parameter/],
-  ['invalid_parameter', /invalid parameter/],
-  ['background', /background/],
-  ['store', /store/],
-  ['stream', /stream/],
-  ['reasoning', /reasoning/],
-  ['reasoning_effort', /(?=.*reasoning)(?=.*effort)/],
-  ['max_output_tokens', /max_output_tokens/],
-  ['input', /input/],
-  ['text_format', /text\.format/],
-  ['json_schema', /json_schema|json schema/],
-  ['schema', /schema/],
-  ['responses_api', /\/v1\/responses|responses api/],
-  ['chat_completions', /chat\/completions|chat completions/],
-  ['endpoint', /endpoint/],
+  ['model', messageHintPattern(/model/)],
+  ['model_not_found', messageHintPattern(/model/, /not found|does not exist|unknown model/)],
+  ['model_unsupported', messageHintPattern(/model/, /unsupported|not supported/)],
+  ['authentication', messageHintPattern(/api key|authentication|unauthorized/)],
+  ['permission', messageHintPattern(/permission|forbidden/)],
+  ['rate_limit', messageHintPattern(/rate limit/)],
+  ['quota', messageHintPattern(/quota/)],
+  ['unsupported', messageHintPattern(/unsupported|not supported/)],
+  ['unknown_parameter', messageHintPattern(/unknown parameter|unrecognized parameter/)],
+  ['invalid_parameter', messageHintPattern(/invalid parameter/)],
+  ['background', messageHintPattern(/background/)],
+  ['store', messageHintPattern(/store/)],
+  ['stream', messageHintPattern(/stream/)],
+  ['reasoning', messageHintPattern(/reasoning/)],
+  ['reasoning_effort', messageHintPattern(/reasoning/, /effort/)],
+  ['max_output_tokens', messageHintPattern(/max_output_tokens/)],
+  ['input', messageHintPattern(/input/)],
+  ['text_format', messageHintPattern(/text\.format/)],
+  ['json_schema', messageHintPattern(/json_schema|json schema/)],
+  ['schema', messageHintPattern(/schema/)],
+  ['responses_api', messageHintPattern(/\/v1\/responses|responses api/)],
+  ['chat_completions', messageHintPattern(/chat\/completions|chat completions/)],
+  ['endpoint', messageHintPattern(/endpoint/)],
 ] as const;
 
 export type Lave8ErrorMessageHint = typeof ERROR_MESSAGE_HINT_RULES[number][0] | 'other';
